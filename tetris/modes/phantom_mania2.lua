@@ -86,12 +86,8 @@ function PhantomMania2Game:getGarbageLimit()
 	else return 8 end
 end
 
-function PhantomMania2Game:getNextPiece(ruleset)
-	return {
-		skin = self.level >= 1000 and "bone" or "2tie",
-		shape = self.randomizer:nextPiece(),
-		orientation = ruleset:getDefaultOrientation(),
-	}
+function PhantomMania2Game:getSkin()
+	return self.level >= 1000 and "bone" or "2tie"
 end
 
 function PhantomMania2Game:hitTorikan(old_level, new_level)
@@ -255,7 +251,7 @@ PhantomMania2Game.garbageOpacityFunction = function(age)
 end
 
 function PhantomMania2Game:drawGrid()
-	if not (self.game_over or (self.clear and self.level < 1300)) then
+	if not (self.game_over) then
 		self.grid:drawInvisible(self.rollOpacityFunction, self.garbageOpacityFunction)
 	else
 		self.grid:draw()
@@ -291,7 +287,7 @@ function PhantomMania2Game:setHoldOpacity()
 	if self.level > 1000 and self.level < 1300 then
 		love.graphics.setColor(1, 1, 1, 1 - math.min(1, self.hold_age / 15))
 	else
-		love.graphics.setColor(1, 1, 1, 1)
+		self.super:setHoldOpacity(1, self.held and 0.6 or 1)
 	end
 end
 

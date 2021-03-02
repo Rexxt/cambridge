@@ -56,9 +56,19 @@ end
 
 function formatBigNum(number)
 	-- returns a string representing a number with commas as thousands separator (e.g. 12,345,678)
-	local s = string.format("%d", number)
-	local pos = string.len(s) % 3
-	if pos == 0 then pos = 3 end
+	local s
+	if type(number) == "number" then
+		s = string.format("%d", number)
+	elseif type(number) == "string" then
+		if not tonumber(number) then
+			return
+		else
+			s = number
+		end
+	else
+		return
+	end
+	local pos = Mod1(string.len(s), 3)
 	return string.sub(s, 1, pos)
 		.. string.gsub(string.sub(s, pos+1), "(...)", ",%1")
 end
@@ -66,4 +76,17 @@ end
 function Mod1(n, m)
 	-- returns a number congruent to n modulo m in the range [1;m] (as opposed to [0;m-1])
 	return ((n-1) % m) + 1
+end
+
+function table.contains(table, element)
+	for _, value in pairs(table) do
+	  	if value == element then
+			return true
+	  	end
+	end
+	return false
+end
+
+function clamp(a, b, c)
+	return math.min(a, math.max(b, c))
 end

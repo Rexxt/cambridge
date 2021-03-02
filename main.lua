@@ -7,13 +7,29 @@ function love.load()
 	require "load.sounds"
 	require "load.bgm"
 	require "load.save"
+	require "load.bigint"
 	loadSave()
 	require "scene"
-	config["side_next"] = false
-	config["reverse_rotate"] = true
+	
+	--config["side_next"] = false
+	--config["reverse_rotate"] = true
+	--config["das_last_key"] = false
 	config["fullscreen"] = false
 
 	love.window.setMode(love.graphics.getWidth(), love.graphics.getHeight(), {resizable = true});
+    
+    -- used for screenshots
+    GLOBAL_CANVAS = love.graphics.newCanvas()
+
+	-- init config
+	if not config.das then config.das = 10 end
+	if not config.arr then config.arr = 2 end
+	if not config.dcd then config.dcd = 0 end
+	if not config.sfx_volume then config.sfx_volume = 0.5 end
+	if not config.bgm_volume then config.bgm_volume = 0.5 end
+	
+	if config.secret == nil then config.secret = false
+	elseif config.secret == true then playSE("welcome") end
 
 	if not config.gamesettings then config.gamesettings = {} end
 	for _, option in ipairs(GameConfigScene.options) do
@@ -23,7 +39,7 @@ function love.load()
 	end
 	
 	if not config.input then
-		scene = InputConfigScene()
+		scene = KeyConfigScene()
 	else
 		if config.current_mode then current_mode = config.current_mode end
 		if config.current_ruleset then current_ruleset = config.current_ruleset end
@@ -92,7 +108,10 @@ function love.update(dt)
 end
 
 function love.draw()
-	love.graphics.push()
+    love.graphics.setCanvas(GLOBAL_CANVAS)
+    love.graphics.clear()
+	
+    love.graphics.push()
 
 	-- get offset matrix
 	love.graphics.setDefaultFilter("linear", "nearest")
@@ -104,9 +123,13 @@ function love.draw()
 		(height - scale_factor * 480) / 2
 	)
 	love.graphics.scale(scale_factor)
-
+    
 	scene:render()
 	love.graphics.pop()
+    
+    love.graphics.setCanvas()
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.draw(GLOBAL_CANVAS)
 end
 
 function love.keypressed(key, scancode)
@@ -116,6 +139,24 @@ function love.keypressed(key, scancode)
 		love.window.setFullscreen(config["fullscreen"])
 	elseif scancode == "f2" and scene.title ~= "Input Config" and scene.title ~= "Game" then
 		scene = InputConfigScene()
+		switchBGM(nil)
+	-- secret sound playing :eyes:
+	elseif scancode == "f8" and scene.title == "Title" then
+		config.secret = not config.secret
+		saveConfig()
+		scene.restart_message = true
+		if config.secret then playSE("mode_decide")
+		else playSE("erase") end
+    -- f12 is reserved for saving screenshots
+    elseif scancode == "f12" then
+        local ss_name = os.date("ss/%Y-%m-%d_%H-%M-%S.png")
+		local info = love.filesystem.getInfo("ss")
+		if not info or info.type ~= "directory" then
+			love.filesystem.remove("ss")
+			love.filesystem.createDirectory("ss")
+		end
+        print("Saving screenshot as "..ss_name)
+        GLOBAL_CANVAS:newImageData():encode("png", ss_name)
 	-- function keys are reserved
 	elseif string.match(scancode, "^f[1-9]$") or string.match(scancode, "^f[1-9][0-9]+$") then
 		return	
@@ -186,13 +227,13 @@ function love.joystickaxis(joystick, axis, value)
 		config.input.joysticks[joystick:getName()].axes and
 		config.input.joysticks[joystick:getName()].axes[axis] 
 	then
-		if math.abs(value) >= 0.5 then
+		if math.abs(value) >= 1 then
 			input_pressed = config.input.joysticks[joystick:getName()].axes[axis][value >= 0.5 and "positive" or "negative"]
 		end
 		positive_released = config.input.joysticks[joystick:getName()].axes[axis].positive
 		negative_released = config.input.joysticks[joystick:getName()].axes[axis].negative
 	end
-	if math.abs(value) >= 0.5 then
+	if math.abs(value) >= 1 then
 		scene:onInputPress({input=input_pressed, type="joyaxis", name=joystick:getName(), axis=axis, value=value})
 	else
 		scene:onInputRelease({input=positive_released, type="joyaxis", name=joystick:getName(), axis=axis, value=value})
@@ -231,9 +272,14 @@ function love.joystickhat(joystick, hat, direction)
 end
 
 function love.focus(f)
-	if f then
+	if f and (scene.title ~= "Game" or not scene.paused) then
 		resumeBGM()
 	else
 		pauseBGM()
 	end
+end
+
+function love.resize(w, h)
+    GLOBAL_CANVAS:release()
+    GLOBAL_CANVAS = love.graphics.newCanvas(w, h)
 end

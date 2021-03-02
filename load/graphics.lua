@@ -20,6 +20,7 @@ backgrounds = {
 	love.graphics.newImage("res/backgrounds/1800.png"),
 	love.graphics.newImage("res/backgrounds/1900.png"),
 	title = love.graphics.newImage("res/backgrounds/title.png"),
+	snow = love.graphics.newImage("res/backgrounds/snow.png"),
 	input_config = love.graphics.newImage("res/backgrounds/options-input.png"),
 	game_config = love.graphics.newImage("res/backgrounds/options-game.png"),
 }
@@ -48,6 +49,23 @@ blocks = {
 		F = love.graphics.newImage("res/img/bone.png"),
 		A = love.graphics.newImage("res/img/bone.png"),
 		X = love.graphics.newImage("res/img/bone.png"),
+	},
+	["gem"] = {
+		R = love.graphics.newImage("res/img/gem1.png"),
+		O = love.graphics.newImage("res/img/gem3.png"),
+		Y = love.graphics.newImage("res/img/gem7.png"),
+		G = love.graphics.newImage("res/img/gem6.png"),
+		C = love.graphics.newImage("res/img/gem2.png"),
+		B = love.graphics.newImage("res/img/gem4.png"),
+		M = love.graphics.newImage("res/img/gem5.png"),
+		F = love.graphics.newImage("res/img/gem9.png"),
+		A = love.graphics.newImage("res/img/gem9.png"),
+		X = love.graphics.newImage("res/img/gem9.png"),
+	},
+	["square"] = {
+		F = love.graphics.newImage("res/img/squares.png"),
+		Y = love.graphics.newImage("res/img/squareg.png"),
+		X = love.graphics.newImage("res/img/squares.png"),
 	}
 }
 
@@ -84,4 +102,5 @@ misc_graphics = {
 	go = love.graphics.newImage("res/img/go.png"),
 	select_mode = love.graphics.newImage("res/img/select_mode.png"),
 	strike = love.graphics.newImage("res/img/strike.png"),
+	santa = love.graphics.newImage("res/img/santa.png")
 }

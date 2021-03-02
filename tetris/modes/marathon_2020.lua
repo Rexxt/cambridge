@@ -144,6 +144,7 @@ function Marathon2020Game:advanceOneFrame()
 		if self.roll_frames < 0 then
 			return false
 		elseif self.roll_frames > 4000 then
+			if self.grade >= 30 and self.section_cool_count >= 20 then self.grade = 31 end
 			self.completed = true
 		end
 	elseif self.ready_frames == 0 then
@@ -248,14 +249,17 @@ function Marathon2020Game:updateGrade(cleared_lines)
 end
 
 function Marathon2020Game:getTotalGrade()
+	if self.grade + self.section_cool_count > 50 then return "GM" end
 	return self.grade + self.section_cool_count
 end
 
 local function getSectionForLevel(level)
 	if level < 2001 then
 		return math.floor(level / 100) + 1
-	else
+	elseif level < 2020 then
 		return 20
+	else
+		return 21
 	end
 end
 
@@ -325,10 +329,10 @@ function Marathon2020Game:checkClear(level)
 end
 
 function Marathon2020Game:updateSectionTimes(old_level, new_level)
-	function sectionCool()
+	function sectionCool(section)
 		self.section_cool_count = self.section_cool_count + 1
 		self.delay_level = math.min(20, self.delay_level + 1)
-		table.insert(self.section_status, "cool")
+		if section < 10 then table.insert(self.section_status, "cool") end
 		self.cool_timer = 300
 	end
 
@@ -346,7 +350,7 @@ function Marathon2020Game:updateSectionTimes(old_level, new_level)
 		table.insert(self.section_times, section_time)
 		self.section_start_time = self.frames
 
-		if section > 4 then self.delay_level = math.min(20, self.delay_level + 1) end
+		if section > 5 then self.delay_level = math.min(20, self.delay_level + 1) end
 		self:checkTorikan(section)
 		self:checkClear(new_level)
 
@@ -355,11 +359,11 @@ function Marathon2020Game:updateSectionTimes(old_level, new_level)
 			self.secondary_section_times[section] < self.secondary_section_times[section - 1] + 120 and
 			self.secondary_section_times[section] < cool_cutoffs[section]
 		) then
-			sectionCool()
+			sectionCool(section)
 		elseif self.section_status[section - 1] == "cool" then
 			table.insert(self.section_status, "none")
 		elseif section <= 19 and self.secondary_section_times[section] < cool_cutoffs[section] then
-			sectionCool()
+			sectionCool(section)
 		else
 			table.insert(self.section_status, "none")
 		end
@@ -392,7 +396,6 @@ Marathon2020Game.mRollOpacityFunction = function(age)
 end
 
 function Marathon2020Game:qualifiesForMRoll()
-	return false -- until I actually have grading working
 --[[
 
 GM-roll requirements
@@ -403,6 +406,8 @@ You qualify for the GM roll if you:
 - in less than 13:30.00 total.
 
 ]]--
+	
+	return self.level >= 2020 and self:getTotalGrade() == 50 and self.frames <= frameTime(13,30)
 end
 
 function Marathon2020Game:drawGrid()
@@ -420,6 +425,14 @@ function Marathon2020Game:drawGrid()
 	end
 end
 
+function Marathon2020Game:sectionColourFunction(section)
+	if self.section_status[section] == "cool" then
+		return { 0, 1, 0, 1 }
+	else
+		return { 1, 1, 1, 1 }
+	end
+end
+
 function Marathon2020Game:drawScoringInfo()
 	Marathon2020Game.super.drawScoringInfo(self)
 
@@ -431,7 +444,7 @@ function Marathon2020Game:drawScoringInfo()
 	love.graphics.printf("GRADE PTS.", text_x, 200, 90, "left")
 	love.graphics.printf("LEVEL", text_x, 320, 40, "left")
 
-	self:drawSectionTimesWithSecondary(current_section)
+	self:drawSectionTimesWithSecondary(current_section, 20)
 
 	if (self.cool_timer > 0) then
 				love.graphics.printf("COOL!!", 64, 400, 160, "center")

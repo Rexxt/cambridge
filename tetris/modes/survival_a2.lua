@@ -30,6 +30,11 @@ function SurvivalA2Game:new()
 	self.lock_hard_drop = true
 end
 
+function SurvivalA2Game:initialize(ruleset)
+	SurvivalA2Game.super.initialize(self, ruleset)
+	self.world = ruleset.world
+end
+
 function SurvivalA2Game:getARE()
 		if self.level < 100 then return 18
 	elseif self.level < 300 then return 14
@@ -69,7 +74,8 @@ function SurvivalA2Game:getGravity()
 end
 
 function SurvivalA2Game:hitTorikan(old_level, new_level)
-	if old_level < 500 and new_level >= 500 and self.frames > frameTime(3,25) then
+	local torikan_time = self.world and frameTime(3,55) or frameTime(3,25)
+	if old_level < 500 and new_level >= 500 and self.frames > torikan_time then
 		self.level = 500
 		return true
 	end
@@ -159,8 +165,9 @@ function SurvivalA2Game:drawScoringInfo()
 	love.graphics.setFont(font_3x5_3)
 	love.graphics.printf(self.score, text_x, 220, 90, "left")
 	if self.roll_frames > 2968 then love.graphics.setColor(1, 0.5, 0, 1)
-	elseif self.clear then love.graphics.setColor(0, 1, 0, 1) end
+	elseif self.level >= 999 and self.clear then love.graphics.setColor(0, 1, 0, 1) end
 	if self:getLetterGrade() ~= "" then love.graphics.printf(self:getLetterGrade(), text_x, 140, 90, "left") end
+	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.printf(self.level, text_x, 340, 40, "right")
 	love.graphics.printf(self:getSectionEndLevel(), text_x, 370, 40, "right")
 	if sg >= 5 then

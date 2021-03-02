@@ -78,12 +78,15 @@ function Piece:setRelativeRotation(rot)
 	return self
 end
 
-function Piece:moveInGrid(step, squares, grid)
+function Piece:moveInGrid(step, squares, grid, instant)
 	local moved = false
 	for x = 1, squares do
 		if grid:canPlacePiece(self:withOffset(step)) then
 			moved = true
 			self:setOffset(step)
+			if instant then
+				self:dropToBottom(grid)
+			end
 		else
 			break
 		end
@@ -101,9 +104,8 @@ function Piece:dropToBottom(grid)
 	self:dropSquares(math.huge, grid)
 	self.gravity = 0
 	if self.position.y > piece_y then
-		-- if it got dropped any, also reset lock delay
 		if self.ghost == false then playSE("bottom") end
-		self.lock_delay = 0
+		-- self.lock_delay = 0
 	end
 	return self
 end
@@ -115,19 +117,36 @@ function Piece:lockIfBottomed(grid)
 	return self
 end
 
-function Piece:addGravity(gravity, grid)
+function Piece:addGravity(gravity, grid, classic_lock)
 	local new_gravity = self.gravity + gravity
 	if self:isDropBlocked(grid) then
-		self.gravity = math.min(1, new_gravity)
-		self.lock_delay = self.lock_delay + 1
-	else
-		local dropped_squares = math.floor(new_gravity)
-		local new_frac_gravity = new_gravity - dropped_squares
-		self.gravity = new_frac_gravity
-		self:dropSquares(dropped_squares, grid)
-		if self:isDropBlocked(grid) then
-			playSE("bottom")
+		if classic_lock then
+			self.gravity = math.min(1, new_gravity)
+		else
+			self.gravity = 0
+			self.lock_delay = self.lock_delay + 1
 		end
+	elseif not (
+		self:isMoveBlocked(grid, { x=0, y=-1 }) and gravity < 0
+	) then
+		local dropped_squares = math.floor(math.abs(new_gravity))
+		if gravity >= 0 then
+			local new_frac_gravity = new_gravity - dropped_squares
+			self.gravity = new_frac_gravity
+			self:dropSquares(dropped_squares, grid)
+			if self:isDropBlocked(grid) then
+				playSE("bottom")
+			end
+		else
+			local new_frac_gravity = new_gravity + dropped_squares
+			self.gravity = new_frac_gravity
+			self:moveInGrid({ x=0, y=-1 }, dropped_squares, grid)
+			if self:isMoveBlocked(grid, { x=0, y=-1 }) then
+				playSE("bottom")
+			end
+		end
+	else
+		self.gravity = 0
 	end
 	return self
 end
@@ -140,9 +159,10 @@ function Piece:draw(opacity, brightness, grid, partial_das)
 	love.graphics.setColor(brightness, brightness, brightness, opacity)
 	local offsets = self:getBlockOffsets()
 	local gravity_offset = 0
-	--if grid ~= nil and not self:isDropBlocked(grid) then
-	--	gravity_offset = self.gravity * 16
-	--end
+	if config.gamesettings.smooth_movement == 1 and 
+	   grid ~= nil and not self:isDropBlocked(grid) then
+		gravity_offset = self.gravity * 16
+	end
 	if partial_das == nil then partial_das = 0 end
 	for index, offset in pairs(offsets) do
 		local x = self.position.x + offset.x

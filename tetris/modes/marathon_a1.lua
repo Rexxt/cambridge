@@ -2,6 +2,7 @@ require 'funcs'
 
 local GameMode = require 'tetris.modes.gamemode'
 local Piece = require 'tetris.components.piece'
+local Grid = require 'tetris.components.grid'
 
 local History4RollsRandomizer = require 'tetris.randomizers.history_4rolls'
 

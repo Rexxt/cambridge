@@ -26,6 +26,7 @@ function MarathonA2Game:new()
 	self.section_start_time = 0
 	self.section_times = { [0] = 0 }
 	self.section_tetrises = { [0] = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+	self.tetris_count = 0
 	
 	self.SGnames = {
 		"9", "8", "7", "6", "5", "4", "3", "2", "1",
@@ -130,6 +131,9 @@ end
 function MarathonA2Game:updateScore(level, drop_bonus, cleared_lines)
 	if not self.clear then
 		self:updateGrade(cleared_lines)
+		if cleared_lines >= 4 then
+			self.tetris_count = self.tetris_count + 1
+		end
 		if self.grid:checkForBravo(cleared_lines) then self.bravo = 4 else self.bravo = 1 end
 		if cleared_lines > 0 then
 			self.combo = self.combo + (cleared_lines - 1) * 2
@@ -145,6 +149,7 @@ function MarathonA2Game:updateScore(level, drop_bonus, cleared_lines)
 end
 
 function MarathonA2Game:onLineClear(cleared_row_count)
+	self:updateSectionTimes(self.level, self.level + cleared_row_count)
 	self.level = math.min(self.level + cleared_row_count, 999)
 	if self.level == 999 and not self.clear then
 		self.clear = true
@@ -164,6 +169,8 @@ function MarathonA2Game:updateSectionTimes(old_level, new_level)
 		section_time = self.frames - self.section_start_time
 		self.section_times[math.floor(old_level / 100)] = section_time
 		self.section_start_time = self.frames
+		self.section_tetrises[math.floor(old_level / 100)] = self.tetris_count
+		self.tetris_count = 0
 	end
 end
 
@@ -231,14 +238,16 @@ local grade_conversion = {
 	17, 18, 19
 }
 
+function MarathonA2Game:whilePieceActive()
+	self.grade_point_decay_counter = self.grade_point_decay_counter + 1
+	if self.grade_point_decay_counter >= grade_point_decays[self.grade + 1] then
+		self.grade_point_decay_counter = 0
+		self.grade_points = math.max(0, self.grade_points - 1)
+	end
+end
+
 function MarathonA2Game:updateGrade(cleared_lines)
-	if self.clear then return end
-	if cleared_lines == 0 then
-		self.grade_point_decay_counter = self.grade_point_decay_counter + 1
-		if self.grade_point_decay_counter >= grade_point_decays[self.grade + 1] then
-			self.grade_point_decay_counter = 0
-			self.grade_points = math.max(0, self.grade_points - 1)
-		end
+	if self.clear or cleared_lines == 0 then return
 	else
 		self.grade_points = self.grade_points + (
 			math.ceil(
@@ -310,12 +319,12 @@ MarathonA2Game.mRollOpacityFunction = function(age)
 	else return 1 - age / 4 end
 end
 
-function MarathonA2Game:drawGrid(ruleset)
+function MarathonA2Game:drawGrid()
 	if self.clear and not (self.completed or self.game_over) then
 		if self:qualifiesForMRoll() then
-			self.grid:drawInvisible(self.mRollOpacityFunction)
+			self.grid:drawInvisible(self.mRollOpacityFunction, nil, false)
 		else
-			self.grid:drawInvisible(self.rollOpacityFunction)
+			self.grid:drawInvisible(self.rollOpacityFunction, nil, false)
 		end
 	else
 		self.grid:draw()

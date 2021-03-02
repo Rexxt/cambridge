@@ -4,7 +4,7 @@ local Ruleset = require 'tetris.rulesets.ruleset'
 local SRS = Ruleset:extend()
 
 SRS.name = "Ti-World"
-SRS.hash = "Bad I-kicks"
+SRS.hash = "StandardTI"
 SRS.world = true
 SRS.colourscheme = {
 	I = "C",
@@ -17,6 +17,9 @@ SRS.colourscheme = {
 }
 SRS.softdrop_lock = false
 SRS.harddrop_lock = true
+
+SRS.MANIPULATIONS_MAX = 10
+SRS.ROTATIONS_MAX = 8
 
 SRS.spawn_positions = {
 	I = { x=5, y=4 },
@@ -86,22 +89,22 @@ SRS.block_offsets = {
 SRS.wallkicks_3x3 = {
 	[0]={
 		[1]={{x=-1, y=0}, {x=-1, y=-1}, {x=0, y=2}, {x=-1, y=2}},
-		[2]={{x=0, y=1}, {x=0, y=-1}},
+		[2]={{x=1,y=0},{x=2,y=0},{x=1,y=1},{x=2,y=1},{x=-1,y=0},{x=-2,y=0},{x=-1,y=1},{x=-2,y=1},{x=0,y=-1},{x=3,y=0},{x=-3,y=0}},
 		[3]={{x=1, y=0}, {x=1, y=-1}, {x=0, y=2}, {x=1, y=2}},
 	},
 	[1]={
 		[0]={{x=1, y=0}, {x=1, y=1}, {x=0, y=-2}, {x=1, y=-2}},
 		[2]={{x=1, y=0}, {x=1, y=1}, {x=0, y=-2}, {x=1, y=-2}},
-		[3]={{x=0, y=1}, {x=0, y=-1}},
+		[3]={{x=0,y=1},{x=0,y=2},{x=-1,y=1},{x=-1,y=2},{x=0,y=-1},{x=0,y=-2},{x=-1,y=-1},{x=-1,y=-2},{x=1,y=0},{x=0,y=3},{x=0,y=-3}},
 	},
 	[2]={
-		[0]={{x=0, y=1}, {x=0, y=-1}},
+		[0]={{x=-1,y=0},{x=-2,y=0},{x=-1,y=-1},{x=-2,y=-1},{x=1,y=0},{x=2,y=0},{x=1,y=-1},{x=2,y=-1},{x=0,y=1},{x=-3,y=0},{x=3,y=0}},
 		[1]={{x=-1, y=0}, {x=-1, y=-1}, {x=0, y=2}, {x=-1, y=2}},
 		[3]={{x=1, y=0}, {x=1, y=-1}, {x=0, y=2}, {x=1, y=2}},
 	},
 	[3]={
 		[0]={{x=-1, y=0}, {x=-1, y=1}, {x=0, y=-2}, {x=-1, y=-2}},
-		[1]={{x=0, y=1}, {x=0, y=-1}},
+		[1]={{x=0,y=1},{x=0,y=2},{x=1,y=1},{x=1,y=2},{x=0,y=-1},{x=0,y=-2},{x=1,y=-1},{x=1,y=-2},{x=-1,y=0},{x=0,y=3},{x=0,y=-3}},
 		[2]={{x=-1, y=0}, {x=-1, y=1}, {x=0, y=-2}, {x=-1, y=-2}},
 	},
 };
@@ -109,22 +112,22 @@ SRS.wallkicks_3x3 = {
 SRS.wallkicks_line = {
 	[0]={
 		[1]={{x=-2, y= 0}, {x= 1, y= 0}, {x= 1, y=-2}, {x=-2, y= 1}},
-		[2]={},
+		[2]={{x=-1,y=0},{x=-2,y=0},{x=1,y=0},{x=2,y=0},{x=0,y=1}},
 		[3]={{x= 2, y= 0}, {x=-1, y= 0}, {x=-1, y=-2}, {x= 2, y= 1}},
 	},
 	[1]={
 		[0]={{x= 2, y= 0}, {x=-1, y= 0}, {x= 2, y=-1}, {x=-1, y= 2}},
 		[2]={{x=-1, y= 0}, {x= 2, y= 0}, {x=-1, y=-2}, {x= 2, y= 1}},
-		[3]={},
+		[3]={{x=0,y=1},{x=0,y=2},{x=0,y=-1},{x=0,y=-2},{x=-1,y=0}},
 	},
 	[2]={
-		[0]={},
+		[0]={{x=1,y=0},{x=2,y=0},{x=-1,y=0},{x=-2,y=0},{x=0,y=-1}},
 		[1]={{x=-2, y= 0}, {x= 1, y= 0}, {x=-2, y=-1}, {x= 1, y= 1}},
 		[3]={{x= 2, y= 0}, {x=-1, y= 0}, {x= 2, y=-1}, {x=-1, y= 1}},
 	},
 	[3]={
 		[0]={{x=-2, y= 0}, {x= 1, y= 0}, {x=-2, y=-1}, {x= 1, y= 2}},
-		[1]={},
+		[1]={{x=0,y=1},{x=0,y=2},{x=0,y=-1},{x=0,y=-2},{x=1,y=0}},
 		[2]={{x= 1, y= 0}, {x=-2, y= 0}, {x= 1, y=-2}, {x=-2, y= 1}},
 	},
 };
@@ -149,7 +152,7 @@ function SRS:attemptWallkicks(piece, new_piece, rot_dir, grid)
 		if grid:canPlacePiece(kicked_piece) then
 			piece:setRelativeRotation(rot_dir)
 			piece:setOffset(offset)
-			self:onPieceRotate(piece, grid)
+			self:onPieceRotate(piece, grid, offset.y < 0)
 			return
 		end
 	end
@@ -162,35 +165,37 @@ function SRS:onPieceCreate(piece, grid)
 end
 
 function SRS:onPieceDrop(piece, grid)
-	piece.lock_delay = 0 -- step reset
+    if (piece.manipulations >= self.MANIPULATIONS_MAX or piece.rotations >= self.ROTATIONS_MAX) and piece:isDropBlocked(grid) then
+        piece.locked = true
+    else
+        piece.lock_delay = 0 -- step reset
+    end
 end
 
 function SRS:onPieceMove(piece, grid)
 	piece.lock_delay = 0 -- move reset
 	if piece:isDropBlocked(grid) then
 		piece.manipulations = piece.manipulations + 1
-		if piece.manipulations >= 10 then
+		if piece.manipulations >= self.MANIPULATIONS_MAX then
 			piece.locked = true
 		end
 	end
 end
 
-function SRS:onPieceRotate(piece, grid)
+function SRS:onPieceRotate(piece, grid, upward)
 	piece.lock_delay = 0 -- rotate reset
-	if piece:isDropBlocked(grid) then
-		piece.rotations = piece.rotations + 1
-		if piece.rotations >= 8 then
+	if upward or piece:isDropBlocked(grid) then
+        piece.rotations = piece.rotations + 1
+		if piece.rotations >= self.ROTATIONS_MAX and piece:isDropBlocked(grid) then
 			piece.locked = true
 		end
 	end
 end
 
-function SRS:get180RotationValue() 
-	if config.gamesettings.world_reverse == 1 then
-		return 1
-	else
-		return 3
-	end
+function SRS:canPieceRotate(piece)
+	return piece.rotations < self.ROTATIONS_MAX
 end
+
+function SRS:get180RotationValue() return 3 end
 
 return SRS

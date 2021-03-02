@@ -20,17 +20,21 @@ sounds = {
 	fall = love.audio.newSource("res/se/fall.wav", "static"),
 	ready = love.audio.newSource("res/se/ready.wav", "static"),
 	go = love.audio.newSource("res/se/go.wav", "static"),
+	irs = love.audio.newSource("res/se/irs.wav", "static"),
+	ihs = love.audio.newSource("res/se/ihs.wav", "static"),
+	-- a secret sound!
+	welcome = love.audio.newSource("res/se/welcomeToCambridge.wav", "static"),
 }
 
 function playSE(sound, subsound)
 	if subsound == nil then
-		sounds[sound]:setVolume(0.5)
+		sounds[sound]:setVolume(config.sfx_volume)
 		if sounds[sound]:isPlaying() then
 			sounds[sound]:stop()
 		end
 		sounds[sound]:play()
 	else
-		sounds[sound][subsound]:setVolume(0.1)
+		sounds[sound][subsound]:setVolume(config.sfx_volume)
 		if sounds[sound][subsound]:isPlaying() then
 			sounds[sound][subsound]:stop()
 		end
@@ -40,13 +44,13 @@ end
 
 function playSEOnce(sound, subsound)
 	if subsound == nil then
-		sounds[sound]:setVolume(0.5)
+		sounds[sound]:setVolume(config.sfx_volume)
 		if sounds[sound]:isPlaying() then
 			return
 		end
 		sounds[sound]:play()
 	else
-		sounds[sound][subsound]:setVolume(0.5)
+		sounds[sound][subsound]:setVolume(config.sfx_volume)
 		if sounds[sound][subsound]:isPlaying() then
 			return
 		end

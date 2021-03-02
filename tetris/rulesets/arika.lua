@@ -97,11 +97,11 @@ function ARS:attemptWallkicks(piece, new_piece, rot_dir, grid)
 
 	-- kick right, kick left
 	if (grid:canPlacePiece(new_piece:withOffset({x=1, y=0}))) then
+		self:onPieceRotate(piece, grid)
 		piece:setRelativeRotation(rot_dir):setOffset({x=1, y=0})
-		self:onPieceRotate(piece, grid)
 	elseif (grid:canPlacePiece(new_piece:withOffset({x=-1, y=0}))) then
-		piece:setRelativeRotation(rot_dir):setOffset({x=-1, y=0})
 		self:onPieceRotate(piece, grid)
+		piece:setRelativeRotation(rot_dir):setOffset({x=-1, y=0})
 	end
 
 end
@@ -110,13 +110,7 @@ function ARS:onPieceDrop(piece, grid)
 	piece.lock_delay = 0 -- step reset
 end
 
-function ARS:get180RotationValue() 
-	if config.gamesettings.world_reverse == 3 then
-		return 3
-	else
-		return 1
-	end
-end
+function ARS:get180RotationValue() return 3 end
 
 function ARS:getDefaultOrientation() return 3 end  -- downward facing pieces by default
 

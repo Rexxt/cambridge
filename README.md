@@ -1,13 +1,13 @@
-![Cambridge Banner](https://cdn.discordapp.com/attachments/764432435802013709/767724895076614154/cambridge_logo_lt.png)
+![Cambridge Banner](https://t-sp.in/public/img/cambridge.png)
 
 Cambridge
 =========
 
 Welcome to Cambridge, the next open-source falling-block game engine!
 
-This fork is written and maintained exclusively by [SashLilac](https://github.com/SashLilac), [joezeng](https://github.com/joezeng) and [Oshisaure](https://github.com/oshisaure)!
+The project is written and maintained exclusively by [SashLilac](https://github.com/SashLilac), [joezeng](https://github.com/joezeng) and [Oshisaure](https://github.com/oshisaure)!  
 
-Join our Discord server for help and a welcoming community! https://discord.gg/mteMJw4
+The game also has a website now with more detail than seen on this README: https://t-sp.in/cambridge
 
 Credits
 -------
@@ -17,18 +17,7 @@ Credits
 - [The Tetra Legends Discord](http://discord.com/invite/7hMx5r2) for supporting me and playtesting!
 - [The Absolute Plus](https://discord.gg/6Gf2awJ) for being another source of motivation!
 
-The following people in no particular order also helped with the project:
-- [Hailey](https://github.com/haileylgbt)
-- CylinderKnot
-- MarkGamed7794
-- [Mizu](https://github.com/rexxt)
-- MattMayuga
-- Kitaru
-- switchpalacecorner
-- [sinefuse](https://github.com/sinefuse)
-- [2Tie](https://github.com/2Tie)
-- [nightmareci](https://github.com/nightmareci)
-- [MyPasswordIsWeak](https://github.com/MyPasswordIsWeak)
+More special thanks can be found in-game, under the "Credits" menu.
 
 ![Cambridge Logo](https://cdn.discordapp.com/attachments/625496179433668635/763363717730664458/Icon_2.png)
 
@@ -39,9 +28,15 @@ Playing the game
 
 You do not need LÖVE on Windows, as it comes bundled with the program.  
 
-To get the stable release, simply download the ZIP in the latest release. All assets needed are bundled with the executable.
+#### Stable release
 
-If you want the bleeding edge version, or want mod pack support, download [this](https://github.com/SashLilac/cambridge/archive/master.zip).
+To get the stable release, simply download either `cambridge-win32.zip` (32-bit) or `cambridge-windows.zip` (64-bit) in the [latest release](https://github.com/sashlilac/cambridge/releases/latest).  
+
+All assets needed are bundled with the executable.
+
+#### Bleeding edge
+
+If you want the bleeding edge version, download [this](https://github.com/SashLilac/cambridge/archive/master.zip).
 
 Extract the ZIP, open a Command Prompt at the folder you extracted Cambridge to, then run this command:
 
@@ -59,6 +54,14 @@ Then, check the mod pack section at the bottom of this page.
 
 If you haven't already, install `love` with your favourite package manager (Homebrew on macOS, your system's default on Linux). **Make sure you're using LÖVE 11, because it won't work with earlier versions!**
 
+#### Downloading a release
+
+You can download the .love file in the latest release, and run it with:
+
+    love cambridge.love
+
+#### Installing from source
+
 Clone the repository in git:
 
 	git clone https://github.com/SashLilac/cambridge
@@ -73,9 +76,7 @@ It should run automatically!
 
 ## Installing modpacks
 
-Simply drag your mode, ruleset, and randomizer Lua files into their respective directory, and they should appear automatically.  
-
-Alternatively, install [this](https://github.com/SashLilac/cambridge/releases/download/v0.2.1/modpackv1.zip) mod pack to get a taste of the mod potential.
+For instructions on how to install modpacks, go to [this](https://github.com/SashLilac/cambridge-modpack) mod pack to get a taste of the mod potential.
 
 License
 -------
