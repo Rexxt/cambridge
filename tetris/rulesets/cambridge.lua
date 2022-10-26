@@ -375,7 +375,10 @@ end
 
 function CRS:attemptWallkicks(piece, new_piece, rot_dir, grid)
 
-	if piece.shape == "O" then return end
+	if piece.shape == "O" then
+		self:onPieceRotate(piece, grid)
+		return
+	end
 
 	local kicks = CRS.wallkicks[piece.shape][piece:isDropBlocked(grid)][piece.rotation][new_piece.rotation]
 
@@ -384,9 +387,9 @@ function CRS:attemptWallkicks(piece, new_piece, rot_dir, grid)
 	for idx, offset in pairs(kicks) do
 		kicked_piece = new_piece:withOffset(offset)
 		if grid:canPlacePiece(kicked_piece) then
-			self:onPieceRotate(piece, grid)
 			piece:setRelativeRotation(rot_dir)
 			piece:setOffset(offset)
+			self:onPieceRotate(piece, grid)
 			return
 		end
 	end

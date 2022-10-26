@@ -35,62 +35,20 @@ Ruleset.next_sounds = {
 		T = "T"
 }
 
-Ruleset.pieces = 7
-
 -- Component functions.
 
 function Ruleset:new(game_mode)
 	self.game = game_mode
+	local bones
 	if config.gamesettings.piece_colour == 1 then
-		blocks["bone"] = (not self.world) and
-		{
-			R = love.graphics.newImage("res/img/bone.png"),
-			O = love.graphics.newImage("res/img/bone.png"),
-			Y = love.graphics.newImage("res/img/bone.png"),
-			G = love.graphics.newImage("res/img/bone.png"),
-			C = love.graphics.newImage("res/img/bone.png"),
-			B = love.graphics.newImage("res/img/bone.png"),
-			M = love.graphics.newImage("res/img/bone.png"),
-			F = love.graphics.newImage("res/img/bone.png"),
-			A = love.graphics.newImage("res/img/bone.png"),
-			X = love.graphics.newImage("res/img/bone.png"),
-		} or {
-			R = love.graphics.newImage("res/img/bonew.png"),
-			O = love.graphics.newImage("res/img/bonew.png"),
-			Y = love.graphics.newImage("res/img/bonew.png"),
-			G = love.graphics.newImage("res/img/bonew.png"),
-			C = love.graphics.newImage("res/img/bonew.png"),
-			B = love.graphics.newImage("res/img/bonew.png"),
-			M = love.graphics.newImage("res/img/bonew.png"),
-			F = love.graphics.newImage("res/img/bonew.png"),
-			A = love.graphics.newImage("res/img/bonew.png"),
-			X = love.graphics.newImage("res/img/bonew.png"),
-		}
+		bones = self.world and "w" or ""
 	else
-		blocks["bone"] = (config.gamesettings.piece_colour == 2) and
-                {
-                        R = love.graphics.newImage("res/img/bone.png"),
-                        O = love.graphics.newImage("res/img/bone.png"),
-                        Y = love.graphics.newImage("res/img/bone.png"),
-                        G = love.graphics.newImage("res/img/bone.png"),
-                        C = love.graphics.newImage("res/img/bone.png"),
-                        B = love.graphics.newImage("res/img/bone.png"),
-                        M = love.graphics.newImage("res/img/bone.png"),
-                        F = love.graphics.newImage("res/img/bone.png"),
-                        A = love.graphics.newImage("res/img/bone.png"),
-                        X = love.graphics.newImage("res/img/bone.png"),
-                } or {
-                        R = love.graphics.newImage("res/img/bonew.png"),
-                        O = love.graphics.newImage("res/img/bonew.png"),
-                        Y = love.graphics.newImage("res/img/bonew.png"),
-                        G = love.graphics.newImage("res/img/bonew.png"),
-                        C = love.graphics.newImage("res/img/bonew.png"),
-                        B = love.graphics.newImage("res/img/bonew.png"),
-                        M = love.graphics.newImage("res/img/bonew.png"),
-                        F = love.graphics.newImage("res/img/bonew.png"),
-                        A = love.graphics.newImage("res/img/bonew.png"),
-                        X = love.graphics.newImage("res/img/bonew.png"),
-                }
+		bones = config.gamesettings.piece_colour == 3 and "w" or ""
+	end
+	for colour in pairs(blocks["2tie"]) do
+		blocks.bone[colour] = love.graphics.newImage(
+			"res/img/bone" .. bones .. ".png"
+		)
 	end
 end
 
@@ -109,7 +67,7 @@ function Ruleset:rotatePiece(inputs, piece, grid, prev_inputs, initial)
 		self:attemptRotate(new_inputs, piece, grid, initial)
 	end
 
-	if not was_drop_blocked and piece:isDropBlocked(grid) then
+	if not initial and not was_drop_blocked and piece:isDropBlocked(grid) then
 		playSE("bottom")
 	end
 
@@ -140,10 +98,12 @@ function Ruleset:attemptRotate(new_inputs, piece, grid, initial)
 	if (grid:canPlacePiece(new_piece)) then
 		piece:setRelativeRotation(rot_dir)
 		self:onPieceRotate(piece, grid)
+		playSE("rotate")
 	else
 		if not(initial and self.enable_IRS_wallkicks == false) then
 			self:attemptWallkicks(piece, new_piece, rot_dir, grid)
 		end
+		playSE("kick")
 	end
 end
 
@@ -156,6 +116,7 @@ function Ruleset:movePiece(piece, grid, move, instant)
 	local was_drop_blocked = piece:isDropBlocked(grid)
 	local offset = ({x=0, y=0})
 	local moves = 0
+	local y = piece.position.y
 	if move == "left" then
 		offset.x = -1
 		moves = 1
@@ -184,29 +145,27 @@ function Ruleset:movePiece(piece, grid, move, instant)
 	if not was_drop_blocked and piece:isDropBlocked(grid) then
 		playSE("bottom")
 	end
+	if instant and piece.position.y ~= y then
+		self:onPieceDrop(piece, grid)
+	end
 end
 
 function Ruleset:dropPiece(
 	inputs, piece, grid, gravity, drop_speed, drop_locked, hard_drop_locked,
 	hard_drop_enabled, additive_gravity, classic_lock
 )
-	if piece.big then
-		gravity = gravity / 2
-		drop_speed = drop_speed / 2
-	end
-
 	local y = piece.position.y
-	if inputs["down"] == true and drop_locked == false then
-		if additive_gravity then
-			piece:addGravity(gravity + drop_speed, grid, classic_lock)
-		else
-			piece:addGravity(math.max(gravity, drop_speed), grid, classic_lock)
-		end
-	elseif inputs["up"] == true and hard_drop_enabled == true then
+	if inputs["up"] == true and hard_drop_enabled == true then
 		if hard_drop_locked == true or piece:isDropBlocked(grid) then
 			piece:addGravity(gravity, grid, classic_lock)
 		else
 			piece:dropToBottom(grid)
+		end
+	elseif inputs["down"] == true and drop_locked == false then
+		if additive_gravity then
+			piece:addGravity(gravity + drop_speed, grid, classic_lock)
+		else
+			piece:addGravity(math.max(gravity, drop_speed), grid, classic_lock)
 		end
 	else
 		piece:addGravity(gravity, grid, classic_lock)
@@ -239,9 +198,7 @@ end
 function Ruleset:initializePiece(
 	inputs, data, grid, gravity, prev_inputs,
 	move, lock_delay, drop_speed,
-	drop_locked, hard_drop_locked, big, irs,
-	buffer_hard_drop, buffer_soft_drop,
-	lock_on_hard_drop, lock_on_soft_drop
+	drop_locked, hard_drop_locked, big, irs
 )
 	local spawn_positions
 	if big then
@@ -249,18 +206,17 @@ function Ruleset:initializePiece(
 	else
 		spawn_positions = self.spawn_positions
 	end
-	local colours = ({self.colourscheme, ColourSchemes.Arika, ColourSchemes.TTC})[config.gamesettings.piece_colour]
-	
-	local spawn_x
-	if (grid.width ~= 10) then
-		local percent = spawn_positions[data.shape].x / 10
-		for i = grid.width - 1, 0, -1 do
-			if i / grid.width <= percent then
-				spawn_x = i
-				break
-			end
-		end
+
+	local colours
+	if table.equalvalues(
+        table.keys(self.colourscheme), {"I", "J", "L", "O", "S", "T", "Z"}
+    ) then
+		colours = ({self.colourscheme, ColourSchemes.Arika, ColourSchemes.TTC})[config.gamesettings.piece_colour]
+	else
+		colours = self.colourscheme
 	end
+	
+	local spawn_x = math.floor(spawn_positions[data.shape].x * grid.width / 10)
 
 	local spawn_dy
 	if (config.gamesettings.spawn_positions == 1) then
@@ -276,7 +232,7 @@ function Ruleset:initializePiece(
 	end
 
 	local piece = Piece(data.shape, data.orientation - 1, {
-		x = spawn_x and spawn_x or spawn_positions[data.shape].x,
+		x = spawn_x,
 		y = spawn_positions[data.shape].y - spawn_dy
 	}, self.block_offsets, 0, 0, data.skin, colours[data.shape], big)
 
@@ -286,14 +242,6 @@ function Ruleset:initializePiece(
 		if (data.orientation - 1) ~= piece.rotation then
 			playSE("irs")
 		end
-	end
-	self:dropPiece(inputs, piece, grid, gravity, drop_speed, drop_locked, hard_drop_locked)
-	if (buffer_hard_drop and config.gamesettings.buffer_lock == 1) then
-		piece:dropToBottom(grid)
-		if lock_on_hard_drop then piece.locked = true end
-	end
-	if (buffer_soft_drop and lock_on_soft_drop and piece:isDropBlocked(grid) and config.gamesettings.buffer_lock == 1) then
-		piece.locked = true
 	end
 	return piece
 end
@@ -307,14 +255,13 @@ function Ruleset:processPiece(
 	drop_locked, hard_drop_locked,
 	hard_drop_enabled, additive_gravity, classic_lock
 )
-
 	local synchroes_allowed = ({not self.world, true, false})[config.gamesettings.synchroes_allowed]
 
 	if synchroes_allowed then
 		self:rotatePiece(inputs, piece, grid, prev_inputs, false)
-		self:movePiece(piece, grid, move, gravity >= 20)
+		self:movePiece(piece, grid, move, gravity >= grid.height - 4)
 	else
-		self:movePiece(piece, grid, move, gravity >= 20)
+		self:movePiece(piece, grid, move, gravity >= grid.height - 4)
 		self:rotatePiece(inputs, piece, grid, prev_inputs, false)
 	end
 	self:dropPiece(

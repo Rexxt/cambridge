@@ -2,18 +2,19 @@
 -- If this variable is true, then strict type checking is performed for all
 -- operations. This may result in slower code, but it will allow you to catch
 -- errors and bugs earlier.
-local strict = false
+local strict = true
 
 --------------------------------------------------------------------------------
 
 local bigint = {}
+setmetatable(bigint, {__call = function(_, arg) return bigint.new(arg) end})
 
 local mt = {
     __add = function(lhs, rhs)
         return bigint.add(lhs, rhs)
     end,
-    __unm = function()
-        return bigint.negate(self)
+    __unm = function(arg)
+        return bigint.negate(arg)
     end,
     __sub = function(lhs, rhs)
         return bigint.subtract(lhs, rhs)
@@ -30,8 +31,17 @@ local mt = {
     __pow = function(lhs, rhs)
         return bigint.exponentiate(lhs, rhs)
     end,
-    __tostring = function()
-        return bigint.unserialize(self, "s")
+    __tostring = function(arg)
+        return bigint.unserialize(arg, "s")
+    end,
+    __eq = function(lhs, rhs)
+        return bigint.compare(lhs, rhs, "==")
+    end,
+    __lt = function(lhs, rhs)
+        return bigint.compare(lhs, rhs, "<")
+    end,
+    __le = function(lhs, rhs)
+        return bigint.compare(lhs, rhs, "<=")
     end
 }
 
@@ -67,7 +77,7 @@ function bigint.new(num)
         end
     end
 
-    return self
+    return bigint.strip(self)
 end
 
 -- Check the type of a big
@@ -85,6 +95,14 @@ function bigint.check(big, force)
         end
     end
     return true
+end
+
+-- Strip leading zeroes from a big, but don't remove the last zero
+function bigint.strip(big)
+	while (#big.digits > 1) and (big.digits[1] == 0) do
+        table.remove(big.digits, 1)
+    end
+	return big
 end
 
 -- Return a new big with the same digits but with a positive sign (absolute
@@ -320,12 +338,7 @@ function bigint.subtract_raw(big1, big2)
     ----------------------------------------------------------------------------
 
 
-    -- Strip leading zeroes if any, but not if 0 is the only digit
-    while (#result.digits > 1) and (result.digits[1] == 0) do
-        table.remove(result.digits, 1)
-    end
-
-    return result
+    return bigint.strip(result)
 end
 
 -- FRONTEND: Addition and subtraction operations, accounting for signs
@@ -355,6 +368,7 @@ function bigint.add(big1, big2)
 
     return result
 end
+
 function bigint.subtract(big1, big2)
     -- Type checking is done by bigint.compare in bigint.add
     -- Subtracting is like adding a negative
@@ -451,7 +465,7 @@ end
 function bigint.exponentiate(big, power)
     -- Type checking for big done by bigint.multiply
     assert(bigint.compare(power, bigint.new(0), ">="),
-           " negative powers are not supported")
+           "negative powers are not supported")
     local exp = power:clone()
 
     if (bigint.compare(exp, bigint.new(0), "==")) then
@@ -521,12 +535,7 @@ function bigint.divide_raw(big1, big2)
             end
         end
 
-        -- Remove leading zeros from result
-        while (result.digits[1] == 0) do
-            table.remove(result.digits, 1)
-        end
-
-        return result, dividend
+        return bigint.strip(result), dividend
     end
 end
 

@@ -5,8 +5,9 @@ local playedReadySE = false
 local playedGoSE = false
 
 local Grid = require 'tetris.components.grid'
-local Randomizer = require 'tetris.randomizers.bag7'
+local Randomizer = require 'tetris.randomizers.randomizer'
 local BagRandomizer = require 'tetris.randomizers.bag'
+local binser = require 'libs.binser'
 
 local GameMode = Object:extend()
 
@@ -15,7 +16,12 @@ GameMode.hash = ""
 GameMode.tagline = ""
 GameMode.rollOpacityFunction = function(age) return 0 end
 
-function GameMode:new(secret_inputs)
+function GameMode:new()
+	self.replay_inputs = {}
+	self.random_low, self.random_high = love.math.getRandomSeed()
+	self.random_state = love.math.getRandomState()
+	self.save_replay = config.gamesettings.save_replay == 1
+	
 	self.grid = Grid(10, 24)
 	self.randomizer = Randomizer()
 	self.piece = nil
@@ -65,6 +71,7 @@ function GameMode:new(secret_inputs)
 	self.lock_on_soft_drop = false
 	self.lock_on_hard_drop = false
 	self.cleared_block_table = {}
+	self.last_lcd = 0
 	self.used_randomizer = nil
 	self.hold_queue = nil
 	self.held = false
@@ -84,10 +91,11 @@ function GameMode:getDasCutDelay() return 0 end
 function GameMode:getGravity() return 1/64 end
 
 function GameMode:getNextPiece(ruleset)
+	local shape = self.used_randomizer:nextPiece()
 	return {
 		skin = self:getSkin(),
-		shape = self.used_randomizer:nextPiece(),
-		orientation = ruleset:getDefaultOrientation(),
+		shape = shape,
+		orientation = ruleset:getDefaultOrientation(shape),
 	}
 end
 
@@ -98,13 +106,11 @@ end
 function GameMode:initialize(ruleset)
 	-- generate next queue
 	self.used_randomizer = (
-		ruleset.pieces == self.randomizer.possible_pieces and
-		self.randomizer or
-		(
-			ruleset.pieces == 7 and
-			Randomizer() or
-			BagRandomizer(ruleset.pieces)
-		)
+		table.equalvalues(
+			table.keys(ruleset.colourscheme),
+			self.randomizer.possible_pieces
+		) and
+		self.randomizer or BagRandomizer(table.keys(ruleset.colourscheme))
 	)
 	self.ruleset = ruleset
 	for i = 1, math.max(self.next_queue_length, 1) do
@@ -114,8 +120,64 @@ function GameMode:initialize(ruleset)
 	self.lock_on_hard_drop = ({ruleset.harddrop_lock, self.instant_hard_drop, true,  false})[config.gamesettings.manlock]
 end
 
+function GameMode:saveReplay()
+	-- Save replay.
+	local replay = {}
+	replay["inputs"] = self.replay_inputs
+	replay["random_low"] = self.random_low
+	replay["random_high"] = self.random_high
+	replay["random_state"] = self.random_state
+	replay["mode"] = self.name
+	replay["ruleset"] = self.ruleset.name
+	replay["timer"] = self.frames
+	replay["score"] = self.score
+	replay["level"] = self.level
+	replay["lines"] = self.lines
+	replay["gamesettings"] = config.gamesettings
+	replay["secret_inputs"] = self.secret_inputs
+	replay["timestamp"] = os.time()
+	if love.filesystem.getInfo("replays") == nil then
+		love.filesystem.createDirectory("replays")
+	end
+	local replay_files = love.filesystem.getDirectoryItems("replays")
+	-- Select replay filename that doesn't collide with an existing one
+	local replay_number = 0
+	local collision = true
+	while collision do
+		collision = false
+		replay_number = replay_number + 1
+		for key, file in pairs(replay_files) do
+			if file == replay_number..".crp" then
+				collision = true
+				break
+			end
+		end
+	end
+	love.filesystem.write("replays/"..replay_number..".crp", binser.serialize(replay))
+end
+
+function GameMode:addReplayInput(inputs)
+	-- check if inputs have changed since last frame
+	if not equals(self.prev_inputs, inputs) then
+		-- insert new inputs into replay inputs table
+		local new_inputs = {}
+		new_inputs["inputs"] = {}
+		new_inputs["frames"] = 1
+		for key, value in pairs(inputs) do
+			new_inputs["inputs"][key] = value
+		end
+		self.replay_inputs[#self.replay_inputs + 1] = new_inputs
+	else
+		-- add 1 to input frame counter
+		self.replay_inputs[#self.replay_inputs]["frames"] = self.replay_inputs[#self.replay_inputs]["frames"] + 1
+	end
+end
+
 function GameMode:update(inputs, ruleset)
 	if self.game_over or self.completed then
+		if self.save_replay and self.game_over_frames == 0 then
+			self:saveReplay()
+		end
 		self.game_over_frames = self.game_over_frames + 1
 		return
 	end
@@ -124,11 +186,12 @@ function GameMode:update(inputs, ruleset)
 		if inputs["left"] or inputs["right"] then
 			inputs["up"] = false
 			inputs["down"] = false
-		elseif inputs["up"] or inputs["down"] then
-			inputs["left"] = false
-			inputs["right"] = false
+		elseif inputs["down"] then
+			inputs["up"] = false
 		end
 	end
+
+	if self.save_replay then self:addReplayInput(inputs) end
 
 	-- advance one frame
 	if self:advanceOneFrame(inputs, ruleset) == false then return end
@@ -150,14 +213,10 @@ function GameMode:update(inputs, ruleset)
 	else
 		-- perform active frame actions such as fading out the next queue
 		self:whilePieceActive()
-		local gravity = self:getGravity()
 
 		if self.enable_hold and inputs["hold"] == true and self.held == false and self.prev_inputs["hold"] == false then
 			self:hold(inputs, ruleset)
 			self.prev_inputs = inputs
-			if not self.grid:canPlacePiece(self.piece) then
-				self.game_over = true
-			end
 			return
 		end
 
@@ -180,7 +239,10 @@ function GameMode:update(inputs, ruleset)
 
 		ruleset:processPiece(
 			inputs, self.piece, self.grid, self:getGravity(), self.prev_inputs,
-			self.move, self:getLockDelay(), self:getDropSpeed(),
+			(
+				inputs.up and self.lock_on_hard_drop and not self.hard_drop_locked
+			) and "none" or self.move,
+			self:getLockDelay(), self:getDropSpeed(),
 			self.drop_locked, self.hard_drop_locked,
 			self.enable_hard_drop, self.additive_gravity, self.classic_lock
 		)
@@ -205,13 +267,13 @@ function GameMode:update(inputs, ruleset)
 			self.piece.last_rotated = false
 			self:onPieceMove(self.piece, self.grid, piece_dx)
 		end
-		if (piece_drot ~= 0) then
-			self.piece.last_rotated = true
-			self:onPieceRotate(self.piece, self.grid, piece_drot)
-		end
 		if (piece_dy ~= 0) then
 			self.piece.last_rotated = false
 			self:onPieceDrop(self.piece, self.grid, piece_dy)
+		end
+		if (piece_drot ~= 0) then
+			self.piece.last_rotated = true
+			self:onPieceRotate(self.piece, self.grid, piece_drot)
 		end
 
 		if inputs["up"] == true and
@@ -225,18 +287,25 @@ function GameMode:update(inputs, ruleset)
 		end
 
 		if inputs["down"] == true then
-			self:onSoftDrop(piece_dy)
+			if not (
+				self.piece:isDropBlocked(self.grid) and
+				piece_drot ~= 0
+			) then
+				self:onSoftDrop(piece_dy)
+			end
 			if self.piece:isDropBlocked(self.grid) and
 				not self.drop_locked and
 				self.lock_on_soft_drop
 			then
 				self.piece.locked = true
+				self.piece_soft_locked = true
 			end
 		end
 
 		if self.piece.locked == true then
 			-- spin detection, immobile only for now
-			if self.immobile_spin_bonus and (
+			if self.immobile_spin_bonus and
+			   self.piece.last_rotated and (
 				self.piece:isDropBlocked(self.grid) and
 				self.piece:isMoveBlocked(self.grid, { x=-1, y=0 }) and 
 				self.piece:isMoveBlocked(self.grid, { x=1, y=0 }) and
@@ -263,8 +332,10 @@ function GameMode:update(inputs, ruleset)
 			end
 
 			if cleared_row_count > 0 then
-				playSE("erase")
+				local row_count_names = {"single","double","triple","quad"}
+				playSE("erase",row_count_names[cleared_row_count] or "quad")
 				self.lcd = self:getLineClearDelay()
+				self.last_lcd = self.lcd
 				self.are = (
 					ruleset.are and self:getLineARE() or 0
 				)
@@ -316,16 +387,27 @@ function GameMode:onPieceEnter() end
 function GameMode:onHold() end
 
 function GameMode:onSoftDrop(dropped_row_count)
-	self.drop_bonus = self.drop_bonus + 1 * dropped_row_count
+	self.drop_bonus = self.drop_bonus + (
+		(self.piece.big and 2 or 1) * dropped_row_count
+	)
 end
 
 function GameMode:onHardDrop(dropped_row_count)
-	self.drop_bonus = self.drop_bonus + 2 * dropped_row_count
+	self:onSoftDrop(dropped_row_count * 2)
 end
 
 function GameMode:onGameOver()
 	switchBGM(nil)
-	love.graphics.setColor(0, 0, 0, 1 - 2 ^ (-self.game_over_frames / 30))
+	local alpha = 0
+	local animation_length = 120
+	if self.game_over_frames < animation_length then
+		-- Show field for a bit, then fade out.
+		alpha = math.pow(2048, self.game_over_frames/animation_length - 1)
+	elseif self.game_over_frames < 2 * animation_length then
+		-- Keep field hidden for a short time, then pop it back in (for screenshots).
+		alpha = 1
+	end
+	love.graphics.setColor(0, 0, 0, alpha)
 	love.graphics.rectangle(
 		"fill", 64, 80,
 		16 * self.grid.width, 16 * (self.grid.height - 4)
@@ -409,11 +491,28 @@ function GameMode:dasCut()
 end
 
 function GameMode:areCancel(inputs, ruleset)
-	if ruleset.are_cancel and self.piece_hard_dropped and
+	if ruleset.are_cancel and strTrueValues(inputs) ~= "" and
 	not self.prev_inputs.up and
-	strTrueValues(inputs) ~= "" then
+	(self.piece_hard_dropped or
+	(self.piece_soft_locked and not self.prev_inputs.down)) then
 		self.lcd = 0
 		self.are = 0
+	end
+end
+
+function GameMode:checkBufferedInputs(inputs)
+	if (
+		config.gamesettings.buffer_lock ~= 1 and
+		not self.prev_inputs["up"] and inputs["up"] and
+		self.enable_hard_drop
+	) then
+		self.buffer_hard_drop = true
+	end
+	if (
+		config.gamesettings.buffer_lock ~= 1 and
+		not self.prev_inputs["down"] and inputs["down"]
+	) then
+		self.buffer_soft_drop = true
 	end
 end
 
@@ -423,12 +522,7 @@ function GameMode:processDelays(inputs, ruleset, drop_speed)
 		playedGoSE = false
 	end
 	if self.ready_frames > 0 then
-		if not self.prev_inputs["up"] and inputs["up"] and self.enable_hard_drop then
-			self.buffer_hard_drop = true
-		end
-		if not self.prev_inputs["down"] and inputs["down"] then
-			self.buffer_soft_drop = true
-		end
+		self:checkBufferedInputs(inputs)
 		if not playedReadySE then
 			playedReadySE = true
 			playSEOnce("ready")
@@ -442,12 +536,7 @@ function GameMode:processDelays(inputs, ruleset, drop_speed)
 			self:initializeOrHold(inputs, ruleset)
 		end
 	elseif self.lcd > 0 then
-		if not self.prev_inputs["up"] and inputs["up"] and self.enable_hard_drop then
-			self.buffer_hard_drop = true
-		end
-		if not self.prev_inputs["down"] and inputs["down"] then
-			self.buffer_soft_drop = true
-		end
+		self:checkBufferedInputs(inputs)
 		self.lcd = self.lcd - 1
 		self:areCancel(inputs, ruleset)
 		if self.lcd == 0 then
@@ -460,12 +549,7 @@ function GameMode:processDelays(inputs, ruleset, drop_speed)
 			end
 		end
 	elseif self.are > 0 then
-		if not self.prev_inputs["up"] and inputs["up"] and self.enable_hard_drop then
-			self.buffer_hard_drop = true
-		end
-		if not self.prev_inputs["down"] and inputs["down"] then
-			self.buffer_soft_drop = true
-		end
+		self:checkBufferedInputs(inputs)
 		self.are = self.are - 1
 		self:areCancel(inputs, ruleset)
 		if self.are == 0 then
@@ -476,16 +560,15 @@ end
 
 function GameMode:initializeOrHold(inputs, ruleset)
 	if (
-		self.frames == 0 or (ruleset.are and self:getARE() ~= 0) and self.ihs or false
+		(self.frames == 0 or (ruleset.are and self:getARE() ~= 0))
+		and self.ihs or false
 	) and self.enable_hold and inputs["hold"] == true then
 		self:hold(inputs, ruleset, true)
 	else
 		self:initializeNextPiece(inputs, ruleset, self.next_queue[1])
 	end
 	self:onPieceEnter()
-	if not self.grid:canPlacePiece(self.piece) then
-		self.game_over = true
-	end
+	self:onEnterOrHold(inputs, ruleset)
 end
 
 function GameMode:hold(inputs, ruleset, ihs)
@@ -498,7 +581,7 @@ function GameMode:hold(inputs, ruleset, ihs)
 		self.hold_queue = {
 			skin = self.piece.skin,
 			shape = self.piece.shape,
-			orientation = ruleset:getDefaultOrientation(),
+			orientation = ruleset:getDefaultOrientation(self.piece.shape),
 		}
 	end
 	if data == nil then
@@ -507,50 +590,69 @@ function GameMode:hold(inputs, ruleset, ihs)
 		self:initializeNextPiece(inputs, ruleset, data, false)
 	end
 	self.held = true
-	if ihs then playSE("ihs")
-	else playSE("hold") end
 	self:onHold()
+	if ihs then
+		playSE("ihs")
+	else
+		playSE("hold")
+		self:onEnterOrHold(inputs, ruleset)
+	end
 end
 
-function GameMode:initializeNextPiece(inputs, ruleset, piece_data, generate_next_piece)
-	self.piece_hard_dropped = false
-	local gravity = self:getGravity()
-	self.piece = ruleset:initializePiece(
-		inputs, piece_data, self.grid, gravity,
-		self.prev_inputs, self.move,
-		self:getLockDelay(), self:getDropSpeed(),
-		self.lock_drop, self.lock_hard_drop, self.big_mode,
-		(
-			self.frames == 0 or (ruleset.are and self:getARE() ~= 0)
-		) and self.irs or false,
-		self.buffer_hard_drop, self.buffer_soft_drop,
-		self.lock_on_hard_drop, self.lock_on_soft_drop
-	)
-	if self.piece:isDropBlocked(self.grid) and
-	   self.grid:canPlacePiece(self.piece) then
+function GameMode:onEnterOrHold(inputs, ruleset)
+	if not self.grid:canPlacePiece(self.piece) then
+		self.game_over = true
+		return
+	elseif self.piece:isDropBlocked(self.grid) then
 		playSE("bottom")
 	end
-	if self.buffer_hard_drop then
-		self.buffer_hard_drop = false
-		self:onHardDrop(self.piece.position.y - (
-			self.big_mode and
-			ruleset.big_spawn_positions[self.piece.shape].y or
-			ruleset.spawn_positions[self.piece.shape].y)
-		)
-	end
-	if self.buffer_soft_drop then
-		self.buffer_soft_drop = false
-	end
-	if self.lock_drop or (
+	ruleset:dropPiece(
+		inputs, self.piece, self.grid, self:getGravity(),
+		self:getDropSpeed(), self.drop_locked, self.hard_drop_locked
+	)
+end
+
+function GameMode:initializeNextPiece(
+	inputs, ruleset, piece_data, generate_next_piece
+)
+	if not self.buffer_soft_drop and self.lock_drop or (
 		not ruleset.are or self:getARE() == 0
 	) then
 		self.drop_locked = true
 	end
-	if self.lock_hard_drop or (
+	if not self.buffer_hard_drop and self.lock_hard_drop or (
 		not ruleset.are or self:getARE() == 0
 	) then
 		self.hard_drop_locked = true
 	end
+	self.piece = ruleset:initializePiece(
+		inputs, piece_data, self.grid, self:getGravity(),
+		self.prev_inputs, self.move,
+		self:getLockDelay(), self:getDropSpeed(),
+		self.drop_locked, self.hard_drop_locked, self.big_mode,
+		(
+			self.frames == 0 or (ruleset.are and self:getARE() ~= 0)
+		) and self.irs or false
+	)
+	if config.gamesettings.buffer_lock == 3 then
+		if self.buffer_hard_drop then
+			local prev_y = self.piece.position.y
+			self.piece:dropToBottom(self.grid)
+			self.piece.locked = self.lock_on_hard_drop
+			self:onHardDrop(self.piece.position.y - prev_y)
+		end
+		if (
+			self.buffer_soft_drop and
+			self.lock_on_soft_drop and
+			self:getGravity() >= self.grid.height - 4
+		) then
+			self.piece.locked = true
+		end
+	end
+	self.piece_hard_dropped = false
+	self.piece_soft_locked = false
+	self.buffer_hard_drop = false
+	self.buffer_soft_drop = false
 	if generate_next_piece == nil then
 		table.remove(self.next_queue, 1)
 		table.insert(self.next_queue, self:getNextPiece(ruleset))
@@ -569,25 +671,84 @@ function GameMode:getHighScoreData()
 end
 
 function GameMode:animation(x, y, skin, colour)
+	-- Animation progress where 0 = start and 1 = end
+	local progress = 1
+	if self.last_lcd ~= 0 then
+		progress = (self.last_lcd - self.lcd) / self.last_lcd
+	end
+	-- Convert progress through the animation into an alpha value, with easing
+	local alpha = 1 - progress ^ 2
 	return {
-		1, 1, 1,
-		-0.25 + 1.25 * (self.lcd / self:getLineClearDelay()),
-		skin, colour,
-		48 + x * 16, y * 16
+			1, 1, 1,
+			alpha,
+			skin, colour,
+			48 + x * 16, y * 16
 	}
+end
+
+function GameMode:canDrawLCA()
+	return self.lcd > 0
 end
 
 function GameMode:drawLineClearAnimation()
 	-- animation function
 	-- params: block x, y, skin, colour
 	-- returns: table with RGBA, skin, colour, x, y
-	
-	-- Fadeout (default)
+
+	-- Quadratic Fadeout (default)
+	--[[
+	function animation(x, y, skin, colour)
+		-- Animation progress where 0 = start and 1 = end
+		local progress = 1
+		if self.last_lcd ~= 0 then
+			progress = (self.last_lcd - self.lcd) / self.last_lcd
+		end
+		-- Convert progress through the animation into an alpha value, with easing
+		local alpha = 1 - progress ^ 2
+		return {
+				1, 1, 1,
+				alpha,
+				skin, colour,
+				48 + x * 16, y * 16
+		}
+	end
+	--]]
+
+	-- Flashy Fadeout
+	--[[
+	function animation(x, y, skin, colour)
+		-- Animation progress where 0 = start and 1 = end
+		local progress = 1
+		if self.last_lcd ~= 0 then
+			progress = (self.last_lcd - self.lcd) / self.last_lcd
+		end
+		-- Change this number to change "bounciness"
+		local bounce = 13
+		-- Convert progress through the animation into an alpha value
+		local alpha = 0
+		-- Cutoff is arbitrary: corresponds to level 500 in Marathon A2
+		if self.last_lcd > 25 then
+			-- Goes up and down: looks better when animation is long
+			alpha = 1 - (bounce * progress^3 - 1.5 * bounce * progress^2 + (0.5 * bounce + 1) * progress)
+		else
+			-- Always decreasing: looks better when animation is short
+			alpha = 1 - progress * progress
+		end
+		return {
+				1, 1, 1,
+				alpha,
+				skin, colour,
+				48 + x * 16, y * 16
+		}
+	end
+	--]]
+
+	-- Fadeout
 	--[[
 	function animation(x, y, skin, colour)
 		return {
 			1, 1, 1,
-			-0.25 + 1.25 * (self.lcd / self:getLineClearDelay()),
+			-0.25 + 1.25 * (self.lcd / self.last_lcd),
 			skin, colour,
 			48 + x * 16, y * 16
 		}
@@ -611,7 +772,7 @@ function GameMode:drawLineClearAnimation()
 	function animation(x, y, skin, colour)
 		local p = 0.5
 		local l = (
-			(self:getLineClearDelay() - self.lcd) / self:getLineClearDelay()
+			(self.last_lcd - self.lcd) / self.last_lcd
 		)
 		local dx = l * (x - (1 + self.grid.width) / 2)
 		local dy = l * (y - (1 + self.grid.height) / 2)
@@ -653,7 +814,9 @@ function GameMode:drawPiece()
 end
 
 function GameMode:drawGhostPiece(ruleset)
-	if self.piece == nil then return end
+	if self.piece == nil or not self.grid:canPlacePiece(self.piece) then
+		return
+	end
 	local ghost_piece = self.piece:withOffset({x=0, y=0})
 	ghost_piece.ghost = true
 	ghost_piece:dropToBottom(self.grid)
@@ -661,7 +824,15 @@ function GameMode:drawGhostPiece(ruleset)
 end
 
 function GameMode:drawNextQueue(ruleset)
-	local colourscheme = ({ruleset.colourscheme, ColourSchemes.Arika, ColourSchemes.TTC})[config.gamesettings.piece_colour]
+	local colourscheme
+	if table.equalvalues(
+		self.used_randomizer.possible_pieces,
+		{"I", "J", "L", "O", "S", "T", "Z"}
+	) then
+		colourscheme = ({ruleset.colourscheme, ColourSchemes.Arika, ColourSchemes.TTC})[config.gamesettings.piece_colour]
+	else
+		colourscheme = ruleset.colourscheme
+	end
 	function drawPiece(piece, skin, offsets, pos_x, pos_y)
 		for index, offset in pairs(offsets) do
 			local x = offset.x + ruleset:getDrawOffset(piece, rotation).x + ruleset.spawn_positions[piece].x
@@ -805,6 +976,104 @@ function GameMode:drawSectionTimesWithSplits(current_section, section_limit)
 	end
 end
 
+function GameMode:drawBackground()
+	love.graphics.setColor(1, 1, 1, 1)
+	love.graphics.draw(
+		backgrounds[self:getBackground()],
+		0, 0, 0,
+		0.5, 0.5
+	)
+end
+
+function GameMode:drawFrame()
+	-- game frame
+	if self.grid.width == 10 and self.grid.height == 24 then
+		love.graphics.draw(misc_graphics["frame"], 48, 64)
+	else
+		love.graphics.setColor(174/255, 83/255, 76/255, 1)
+		love.graphics.setLineWidth(8)
+		love.graphics.line(
+			60,76,
+			68+16*self.grid.width,76,
+			68+16*self.grid.width,84+16*(self.grid.height-4),
+			60,84+16*(self.grid.height-4),
+			60,76
+		)
+		love.graphics.setColor(203/255, 137/255, 111/255, 1)
+		love.graphics.setLineWidth(4)
+		love.graphics.line(
+			60,76,
+			68+16*self.grid.width,76,
+			68+16*self.grid.width,84+16*(self.grid.height-4),
+			60,84+16*(self.grid.height-4),
+			60,76
+		)
+		love.graphics.setLineWidth(1)
+		love.graphics.setColor(0, 0, 0, 200)
+		love.graphics.rectangle(
+			"fill", 64, 80,
+			16 * self.grid.width, 16 * (self.grid.height - 4)
+		)
+	end
+end
+
+function GameMode:drawReadyGo()
+	-- ready/go graphics
+	love.graphics.setColor(1, 1, 1, 1)
+
+	if self.ready_frames <= 100 and self.ready_frames > 52 then
+		love.graphics.draw(misc_graphics["ready"], 144 - 50, 240 - 14)
+	elseif self.ready_frames <= 50 and self.ready_frames > 2 then
+		love.graphics.draw(misc_graphics["go"], 144 - 27, 240 - 14)
+	end
+end
+
 function GameMode:drawCustom() end
+
+function GameMode:drawIfPaused()
+	love.graphics.setFont(font_3x5_3)
+	love.graphics.printf("PAUSED!", 64, 160, 160, "center")
+end
+
+-- transforms specified in here will transform the whole screen
+-- if you want a transform for a particular component, push the
+-- default transform by using love.graphics.push(), do your
+-- transform, and then love.graphics.pop() at the end of that
+-- component's draw call!
+function GameMode:transformScreen() end
+
+function GameMode:draw(paused)
+	self:transformScreen()
+	self:drawBackground()
+	self:drawFrame()
+	self:drawGrid()
+	self:drawPiece()
+	if self:canDrawLCA() then
+		self:drawLineClearAnimation()
+	end
+	self:drawNextQueue(self.ruleset)
+	self:drawScoringInfo()
+	self:drawReadyGo()
+	self:drawCustom()
+
+	love.graphics.setColor(1, 1, 1, 1)
+	love.graphics.setFont(font_3x5_2)
+	if config.gamesettings.display_gamemode == 1 then
+		love.graphics.printf(
+			self.name .. " - " .. self.ruleset.name,
+			0, 460, 640, "left"
+		)
+	end
+
+	if paused then
+		self:drawIfPaused()
+	end
+
+	if self.completed then
+		self:onGameComplete()
+	elseif self.game_over then
+		self:onGameOver()
+	end
+end
 
 return GameMode

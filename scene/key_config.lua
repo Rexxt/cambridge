@@ -35,7 +35,7 @@ function KeyConfigScene:new()
 	self.new_input = {}
 
 	DiscordRPC:update({
-		details = "In menus",
+		details = "In settings",
 		state = "Changing key config",
 	})
 end
@@ -61,7 +61,7 @@ function KeyConfigScene:render()
 	if self.input_state > table.getn(configurable_inputs) then
 		love.graphics.print("press enter to confirm, delete/backspace to retry" .. (config.input and ", escape to cancel" or ""))
 	else
-		love.graphics.print("press key input for " .. configurable_inputs[self.input_state] .. ", tab to skip" .. (config.input and ", escape to cancel" or ""), 0, 0)
+		love.graphics.print("press key input for " .. configurable_inputs[self.input_state] .. ", tab to skip, escape to cancel", 0, 0)
 		love.graphics.print("function keys (F1, F2, etc.), escape, and tab can't be changed", 0, 20)
 	end
 end
@@ -69,8 +69,7 @@ end
 function KeyConfigScene:onInputPress(e)
 	if e.type == "key" then
 		-- function keys, escape, and tab are reserved and can't be remapped
-		if e.scancode == "escape" and config.input then
-			-- cancel only if there was an input config already
+		if e.scancode == "escape" then
 			scene = InputConfigScene()
 		elseif self.input_state > table.getn(configurable_inputs) then
 			if e.scancode == "return" then
@@ -89,7 +88,7 @@ function KeyConfigScene:onInputPress(e)
 		elseif e.scancode == "tab" then
 			self.set_inputs[configurable_inputs[self.input_state]] = "skipped"
 			self.input_state = self.input_state + 1
-		elseif e.scancode ~= "escape" then
+		elseif e.scancode ~= "escape" and not self.new_input[e.scancode] then
 			-- all other keys can be configured
 			self.set_inputs[configurable_inputs[self.input_state]] = "key " .. love.keyboard.getKeyFromScancode(e.scancode) .. " (" .. e.scancode .. ")"
 			self.new_input[e.scancode] = configurable_inputs[self.input_state]

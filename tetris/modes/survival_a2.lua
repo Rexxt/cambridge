@@ -19,7 +19,7 @@ function SurvivalA2Game:new()
 	self.roll_frames = 0
 	self.combo = 1
 	self.randomizer = History6RollsRandomizer()
-	
+
 	self.SGnames = {
 		"9", "8", "7", "6", "5", "4", "3", "2", "1",
 		"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9",
@@ -28,11 +28,6 @@ function SurvivalA2Game:new()
 
 	self.lock_drop = true
 	self.lock_hard_drop = true
-end
-
-function SurvivalA2Game:initialize(ruleset)
-	SurvivalA2Game.super.initialize(self, ruleset)
-	self.world = ruleset.world
 end
 
 function SurvivalA2Game:getARE()
@@ -74,8 +69,7 @@ function SurvivalA2Game:getGravity()
 end
 
 function SurvivalA2Game:hitTorikan(old_level, new_level)
-	local torikan_time = self.world and frameTime(3,55) or frameTime(3,25)
-	if old_level < 500 and new_level >= 500 and self.frames > torikan_time then
+	if old_level < 500 and new_level >= 500 and self.frames > frameTime(3,25) then
 		self.level = 500
 		return true
 	end
@@ -85,7 +79,7 @@ end
 function SurvivalA2Game:advanceOneFrame()
 	if self.clear then
 		self.roll_frames = self.roll_frames + 1
-		if self.roll_frames > 2968 then
+		if self.roll_frames > 1800 then
 			self.completed = true
 		end
 	elseif self.ready_frames == 0 then
@@ -103,14 +97,14 @@ end
 function SurvivalA2Game:onLineClear(cleared_row_count)
 	if not self.clear then
 		local new_level = math.min(self.level + cleared_row_count, 999)
-		if self.level == 999 or self:hitTorikan(self.level, new_level) then
+		if new_level == 999 or self:hitTorikan(self.level, new_level) then
 			self.clear = true
-			if self.level < 999 then
+			if new_level < 999 then
 				self.game_over = true
+				return
 			end
-		else
-			self.level = new_level
 		end
+		self.level = new_level
 	end
 end
 
@@ -164,8 +158,6 @@ function SurvivalA2Game:drawScoringInfo()
 
 	love.graphics.setFont(font_3x5_3)
 	love.graphics.printf(self.score, text_x, 220, 90, "left")
-	if self.roll_frames > 2968 then love.graphics.setColor(1, 0.5, 0, 1)
-	elseif self.level >= 999 and self.clear then love.graphics.setColor(0, 1, 0, 1) end
 	if self:getLetterGrade() ~= "" then love.graphics.printf(self:getLetterGrade(), text_x, 140, 90, "left") end
 	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.printf(self.level, text_x, 340, 40, "right")

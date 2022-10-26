@@ -20,6 +20,7 @@ function MarathonA3Game:new()
 	self.speed_level = 0
 	self.roll_frames = 0
 	self.combo = 1
+	self.grade_combo = 1
 	self.grade = 0
 	self.grade_points = 0
 	self.roll_points = 0
@@ -39,6 +40,7 @@ self.SGnames = {
 		"GM"
 	}
 	
+	self.additive_gravity = false
 	self.lock_drop = true
 	self.lock_hard_drop = true
 	self.enable_hold = true
@@ -216,16 +218,11 @@ function MarathonA3Game:updateSectionTimes(old_level, new_level)
 		section_70_time = self.frames - self.section_start_time
 		table.insert(self.secondary_section_times, section_70_time)
 
-		if section <= 9 and self.section_status[section - 1] == "cool" and
-				self.secondary_section_times[section] < self.secondary_section_times[section - 1] + 120 then
+		if section <= 9 and self.secondary_section_times[section] < cool_cutoffs[section] and
+		  (section == 1 or self.secondary_section_times[section] <= self.secondary_section_times[section - 1] + 120) then
 			self.section_cool = true
 			self.coolregret_message = "COOL!!"
-						self.coolregret_timer = 300
-				elseif self.section_status[section - 1] == "cool" then self.section_cool = false
-				elseif section <= 9 and self.secondary_section_times[section] < cool_cutoffs[section] then
-			self.section_cool = true
-			self.coolregret_message = "COOL!!"
-						self.coolregret_timer = 300
+			self.coolregret_timer = 300
 		end
 	end
 end
@@ -235,12 +232,16 @@ function MarathonA3Game:updateScore(level, drop_bonus, cleared_lines)
 	if not self.clear then	
 		if cleared_lines > 0 then
 			self.combo = self.combo + (cleared_lines - 1) * 2
+			if cleared_lines > 1 then
+				self.grade_combo = self.grade_combo + 1
+			end
 			self.score = self.score + (
 				(math.ceil((level + cleared_lines) / 4) + drop_bonus) *
 				cleared_lines * self.combo
 			)
 		else
 			self.combo = 1
+			self.grade_combo = 1
 		end
 		self.drop_bonus = 0
 	end
@@ -308,7 +309,7 @@ local mroll_points = {10, 20, 30, 100}
 local grade_conversion = {
 	[0] = 0,
 	1, 2, 3, 4, 5, 5, 6, 6, 7, 7,
-	7, 8, 8, 8, 9, 9, 9, 10, 11, 12, 12,
+	7, 8, 8, 8, 9, 9, 9, 10, 11, 12,
 	12, 12, 13, 13, 14, 14, 15, 15, 16, 16,
 	17
 }
@@ -334,7 +335,7 @@ function MarathonA3Game:updateGrade(cleared_lines)
 			self.grade_points = self.grade_points + (
 				math.ceil(
 					grade_point_bonuses[self.grade + 1][cleared_lines] *
-					combo_multipliers[math.min(self.combo, 10)][cleared_lines]
+					combo_multipliers[math.min(self.grade_combo, 10)][cleared_lines]
 				) * (1 + math.floor(self.level / 250))
 			)
 			if self.grade_points >= 100 and self.grade < 31 then
@@ -350,7 +351,11 @@ function MarathonA3Game:qualifiesForMRoll()
 end
 
 function MarathonA3Game:getAggregateGrade()
-	return self.section_cool_grade + math.floor(self.roll_points / 100) + grade_conversion[self.grade]
+	return math.min(
+		self.section_cool_grade +
+		math.floor(self.roll_points / 100) +
+		grade_conversion[self.grade]
+	)
 end
 
 local master_grades = { "M", "MK", "MV", "MO", "MM" }
@@ -365,8 +370,6 @@ function MarathonA3Game:getLetterGrade()
 		return "M" .. tostring(grade - 17)
 	elseif grade < 32 then
 		return master_grades[grade - 26]
-	elseif grade >= 32 and self.roll_frames < 3238 then
-		return "MM"
 	else
 		return "GM"
 	end
@@ -464,7 +467,7 @@ function MarathonA3Game:drawScoringInfo()
 	love.graphics.setFont(font_3x5_3)
 	love.graphics.printf(self.score, 240, 220, 90, "left")
 	if self.roll_frames > 3238 then love.graphics.setColor(1, 0.5, 0, 1)
-	elseif self.level >= 999 and self.clear then love.graphics.setColor(0, 1, 0, 1) end
+	elseif self.level >= 999 then love.graphics.setColor(0, 1, 0, 1) end
 	love.graphics.printf(self:getLetterGrade(), 240, 140, 90, "left")
 	love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.printf(self.level, 240, 340, 40, "right")

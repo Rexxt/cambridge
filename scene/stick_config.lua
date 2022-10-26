@@ -36,7 +36,7 @@ function StickConfigScene:new()
 	self.axis_timer = 0
 
 	DiscordRPC:update({
-		details = "In menus",
+		details = "In settings",
 		state = "Changing joystick config",
 	})
 end
@@ -62,7 +62,7 @@ function StickConfigScene:render()
 	if self.input_state > table.getn(configurable_inputs) then
 		love.graphics.print("press enter to confirm, delete/backspace to retry" .. (config.input and ", escape to cancel" or ""))
 	else
-		love.graphics.print("press joystick input for " .. configurable_inputs[self.input_state] .. ", tab to skip" .. (config.input and ", escape to cancel" or ""), 0, 0)
+		love.graphics.print("press joystick input for " .. configurable_inputs[self.input_state] .. ", tab to skip, escape to cancel", 0, 0)
 	end
 
 	self.axis_timer = self.axis_timer + 1
@@ -82,9 +82,11 @@ function StickConfigScene:onInputPress(e)
 		elseif self.input_state > table.getn(configurable_inputs) then
 			if e.scancode == "return" then
 				-- save new input, then load next scene
-				config.input.joysticks = self.new_input
+				local had_config = config.input ~= nil
+                if not config.input then config.input = {} end
+                config.input.joysticks = self.new_input
 				saveConfig()
-				scene = InputConfigScene()
+				scene = had_config and InputConfigScene() or TitleScene()
 			elseif e.scancode == "delete" or e.scancode == "backspace" then
 				-- retry
 				self.input_state = 1
@@ -102,6 +104,7 @@ function StickConfigScene:onInputPress(e)
 				if not self.new_input[e.name].buttons then
 					self.new_input[e.name].buttons = {}
 				end
+				if self.new_input[e.name].buttons[e.button] then return end
 				self.set_inputs[configurable_inputs[self.input_state]] =
 					"jbtn " ..
 					e.button ..
@@ -109,7 +112,7 @@ function StickConfigScene:onInputPress(e)
 				self.new_input[e.name].buttons[e.button] = configurable_inputs[self.input_state]
 				self.input_state = self.input_state + 1
 			elseif e.type == "joyaxis" then
-				if (e.axis ~= self.last_axis or self.axis_timer > 30) and e.value >= 1 then
+				if (e.axis ~= self.last_axis or self.axis_timer > 30) and math.abs(e.value) >= 1 then
 					addJoystick(self.new_input, e.name)
 					if not self.new_input[e.name].axes then
 						self.new_input[e.name].axes = {}
@@ -117,11 +120,14 @@ function StickConfigScene:onInputPress(e)
 					if not self.new_input[e.name].axes[e.axis] then
 						self.new_input[e.name].axes[e.axis] = {}
 					end
+					if (
+						self.new_input[e.name].axes[e.axis][e.value >= 1 and "positive" or "negative"]
+					) then return end
 					self.set_inputs[configurable_inputs[self.input_state]] =
 						"jaxis " ..
-						e.axis ..
+						(e.value >= 1 and "+" or "-") .. e.axis ..
 						" " .. string.sub(e.name, 1, 10) .. (string.len(e.name) > 10 and "..." or "")
-					self.new_input[e.name].axes[e.axis]["positive"] = configurable_inputs[self.input_state]
+					self.new_input[e.name].axes[e.axis][e.value >= 1 and "positive" or "negative"] = configurable_inputs[self.input_state]
 					self.input_state = self.input_state + 1
 					self.last_axis = e.axis
 					self.axis_timer = 0
@@ -134,6 +140,9 @@ function StickConfigScene:onInputPress(e)
 					end
 					if not self.new_input[e.name].hats[e.hat] then
 						self.new_input[e.name].hats[e.hat] = {}
+					end
+					if self.new_input[e.name].hats[e.hat][e.direction] then
+						return
 					end
 					self.set_inputs[configurable_inputs[self.input_state]] =
 						"jhat " ..

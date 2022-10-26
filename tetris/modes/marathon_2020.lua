@@ -144,7 +144,7 @@ function Marathon2020Game:advanceOneFrame()
 		if self.roll_frames < 0 then
 			return false
 		elseif self.roll_frames > 4000 then
-			if self.grade >= 30 and self.section_cool_count >= 20 then self.grade = 31 end
+			if self:qualifiesForMRoll() then self.grade = 31 end
 			self.completed = true
 		end
 	elseif self.ready_frames == 0 then
@@ -154,11 +154,11 @@ function Marathon2020Game:advanceOneFrame()
 end
 
 local cool_cutoffs = {
-	frameTime(0,45,00), frameTime(0,41,50), frameTime(0,38,50), frameTime(0,35,00), frameTime(0,32,50),
-	frameTime(0,29,20), frameTime(0,27,20), frameTime(0,24,80), frameTime(0,22,80), frameTime(0,20,60),
-	frameTime(0,19,60), frameTime(0,19,40), frameTime(0,19,40), frameTime(0,18,40), frameTime(0,18,20),
-	frameTime(0,16,20), frameTime(0,16,20), frameTime(0,16,20), frameTime(0,16,20), frameTime(0,16,20),
-	frameTime(0,15,20)
+	[0] = frameTime(0,45,00),
+	frameTime(0,41,50), frameTime(0,38,50), frameTime(0,35,00), frameTime(0,32,50), frameTime(0,29,20),
+	frameTime(0,27,20), frameTime(0,24,80), frameTime(0,22,80), frameTime(0,20,60), frameTime(0,19,60),
+	frameTime(0,19,40), frameTime(0,19,40), frameTime(0,18,40), frameTime(0,18,20), frameTime(0,16,20),
+	frameTime(0,16,20), frameTime(0,16,20), frameTime(0,16,20), frameTime(0,16,20), frameTime(0,15,20)
 }
 
 local levels_for_cleared_rows = { 1, 2, 4, 6 }
@@ -227,13 +227,14 @@ local mid_cleared_line_points = {2, 6, 12, 24}
 local high_cleared_line_points = {1, 4, 9, 20}
 
 local function getGradeForGradePoints(points)
-	return math.floor(math.sqrt((points / 50) * 8 + 1) / 2 - 0.5)
+	return math.min(30, math.floor(math.sqrt((points / 50) * 8 + 1) / 2 - 0.5))
 	-- Don't be afraid of the above function. All it does is make it so that
 	-- you need 50 points to get to grade 1, 100 points to grade 2, etc.
 end
 
 function Marathon2020Game:updateGrade(cleared_lines)
 	-- update grade points and max grade points
+	if self.clear then return end
 	local point_level = math.floor(self.level / 100) + self.delay_level
 	local plus_points = math.max(
 		low_cleared_line_points[cleared_lines],
@@ -249,12 +250,11 @@ function Marathon2020Game:updateGrade(cleared_lines)
 end
 
 function Marathon2020Game:getTotalGrade()
-	if self.grade + self.section_cool_count > 50 then return "GM" end
 	return self.grade + self.section_cool_count
 end
 
 local function getSectionForLevel(level)
-	if level < 2001 then
+	if level < 2000 then
 		return math.floor(level / 100) + 1
 	elseif level < 2020 then
 		return 20
@@ -290,10 +290,10 @@ function Marathon2020Game:sectionPassed(old_level, new_level)
 end
 
 function Marathon2020Game:checkTorikan(section)
-	if section == 5 and self.frames < frameTime(6,00,00) then self.torikan_passed[500] = true end
-	if section == 9 and self.frames < frameTime(8,30,00) then self.torikan_passed[900] = true end
-	if section == 10 and self.frames < frameTime(8,45,00) then self.torikan_passed[1000] = true end
-	if section == 15 and self.frames < frameTime(11,30,00) then self.torikan_passed[1500] = true end
+	if section == 5 and self.frames < frameTime(8,00,00) then self.torikan_passed[500] = true end
+	if section == 9 and self.frames < frameTime(10,30,00) then self.torikan_passed[900] = true end
+	if section == 10 and self.frames < frameTime(10,45,00) then self.torikan_passed[1000] = true end
+	if section == 15 and self.frames < frameTime(12,30,00) then self.torikan_passed[1500] = true end
 	if section == 19 and self.frames < frameTime(13,15,00) then self.torikan_passed[1900] = true end
 end
 
@@ -331,14 +331,16 @@ end
 function Marathon2020Game:updateSectionTimes(old_level, new_level)
 	function sectionCool(section)
 		self.section_cool_count = self.section_cool_count + 1
-		self.delay_level = math.min(20, self.delay_level + 1)
-		if section < 10 then table.insert(self.section_status, "cool") end
+		if section <= 10 then
+			self.delay_level = math.min(20, self.delay_level + 1)
+		end
+		table.insert(self.section_status, "cool")
 		self.cool_timer = 300
 	end
 
 	local section = getSectionForLevel(old_level)
 
-	if section <= 19 and old_level % 100 < 70 and new_level >= math.floor(old_level / 100) * 100 + 70 then
+	if old_level % 100 < 70 and new_level >= math.floor(old_level / 100) * 100 + 70 then
 		-- record section 70 time
 		section_70_time = self.frames - self.section_start_time
 		table.insert(self.secondary_section_times, section_70_time)
@@ -350,23 +352,25 @@ function Marathon2020Game:updateSectionTimes(old_level, new_level)
 		table.insert(self.section_times, section_time)
 		self.section_start_time = self.frames
 
-		if section > 5 then self.delay_level = math.min(20, self.delay_level + 1) end
-		self:checkTorikan(section)
-		self:checkClear(new_level)
-
 		if (
-			section <= 19 and self.section_status[section - 1] == "cool" and
-			self.secondary_section_times[section] < self.secondary_section_times[section - 1] + 120 and
-			self.secondary_section_times[section] < cool_cutoffs[section]
+			self.section_status[section - 1] == "cool" and
+			self.secondary_section_times[section] <= self.secondary_section_times[section - 1] + 120 and
+			self.secondary_section_times[section] < cool_cutoffs[self.delay_level]
 		) then
 			sectionCool(section)
 		elseif self.section_status[section - 1] == "cool" then
 			table.insert(self.section_status, "none")
-		elseif section <= 19 and self.secondary_section_times[section] < cool_cutoffs[section] then
+		elseif self.secondary_section_times[section] < cool_cutoffs[self.delay_level] then
 			sectionCool(section)
 		else
 			table.insert(self.section_status, "none")
 		end
+
+		if section > 5 then
+			self.delay_level = math.min(20, self.delay_level + 1)
+		end
+		self:checkTorikan(section)
+		self:checkClear(new_level)
 	end
 end
 
@@ -403,11 +407,12 @@ GM-roll requirements
 You qualify for the GM roll if you:
 - Reach level 2020
 - with a grade of 50
+- and at least 25,000 grade points
 - in less than 13:30.00 total.
 
 ]]--
 	
-	return self.level >= 2020 and self:getTotalGrade() == 50 and self.frames <= frameTime(13,30)
+	return self.level >= 2020 and self:getTotalGrade() == 50 and self.grade_points >= 25000 and self.frames <= frameTime(13,30)
 end
 
 function Marathon2020Game:drawGrid()
@@ -452,7 +457,13 @@ function Marathon2020Game:drawScoringInfo()
 		end	
 
 	love.graphics.setFont(font_3x5_3)
-	love.graphics.printf(self:getTotalGrade(), text_x, 120, 90, "left")
+	
+	local grade = self:getTotalGrade()
+	love.graphics.printf(
+		grade > 50 and "GM" or grade,
+		text_x, 120, 90, "left"
+	)
+
 	love.graphics.printf(self.grade_points, text_x, 220, 90, "left")
 	love.graphics.printf(self.level, text_x, 340, 50, "right")
 
@@ -466,7 +477,7 @@ end
 
 function Marathon2020Game:getHighscoreData()
 	return {
-		grade = self.grade,
+		grade = self:getTotalGrade(),
 		level = self.level,
 		frames = self.frames,
 	}

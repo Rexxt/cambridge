@@ -19,6 +19,7 @@ function MarathonA2Game:new()
 
 	self.roll_frames = 0
 	self.combo = 1
+	self.grade_combo = 1
 	self.randomizer = History6RollsRandomizer()
 	self.grade = 0
 	self.grade_points = 0
@@ -34,6 +35,7 @@ function MarathonA2Game:new()
 		"GM"
 	}
 
+	self.additive_gravity = false
 	self.lock_drop = false
 	self.lock_hard_drop = false
 	self.enable_hold = false
@@ -110,7 +112,7 @@ function MarathonA2Game:advanceOneFrame()
 	if self.clear then
 		self.roll_frames = self.roll_frames + 1
 		if self.roll_frames < 0 then return false end
-		if self.roll_frames > 3694 then
+		if self.roll_frames > 3701 then
 			self.completed = true
 			if self.grade == 32 then
 				self.grade = 33
@@ -134,15 +136,23 @@ function MarathonA2Game:updateScore(level, drop_bonus, cleared_lines)
 		if cleared_lines >= 4 then
 			self.tetris_count = self.tetris_count + 1
 		end
-		if self.grid:checkForBravo(cleared_lines) then self.bravo = 4 else self.bravo = 1 end
+		if self.grid:checkForBravo(cleared_lines) then
+			self.bravo = 4
+		else
+			self.bravo = 1
+		end
 		if cleared_lines > 0 then
 			self.combo = self.combo + (cleared_lines - 1) * 2
+			if cleared_lines > 1 then
+				self.grade_combo = self.grade_combo + 1
+			end
 			self.score = self.score + (
 				(math.ceil((level + cleared_lines) / 4) + drop_bonus) *
 				cleared_lines * self.combo * self.bravo
 			)
 		else
 			self.combo = 1
+			self.grade_combo = 1
 		end
 		self.drop_bonus = 0
 	else self.lines = self.lines + cleared_lines end
@@ -252,7 +262,7 @@ function MarathonA2Game:updateGrade(cleared_lines)
 		self.grade_points = self.grade_points + (
 			math.ceil(
 				grade_point_bonuses[self.grade + 1][cleared_lines] *
-				combo_multipliers[math.min(self.combo, 10)][cleared_lines]
+				combo_multipliers[math.min(self.grade_combo, 10)][cleared_lines]
 			) * (1 + math.floor(self.level / 250))
 		)
 		if self.grade_points >= 100 and self.grade < 31 then
@@ -355,10 +365,10 @@ function MarathonA2Game:drawScoringInfo()
 	love.graphics.setFont(font_3x5_3)
 	if self.clear then
 		if self:qualifiesForMRoll() then
-			if self.lines >= 32 and self.roll_frames > 3694 then love.graphics.setColor(1, 0.5, 0, 1)
+			if self.lines >= 32 and self.roll_frames > 3701 then love.graphics.setColor(1, 0.5, 0, 1)
 			else love.graphics.setColor(0, 1, 0, 1) end
 		else
-			if self.roll_frames > 3694 then love.graphics.setColor(1, 0.5, 0, 1)
+			if self.roll_frames > 3701 then love.graphics.setColor(1, 0.5, 0, 1)
 			else love.graphics.setColor(0, 1, 0, 1) end
 		end
 	end	

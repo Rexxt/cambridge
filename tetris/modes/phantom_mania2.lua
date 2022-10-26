@@ -3,7 +3,7 @@ require 'funcs'
 local GameMode = require 'tetris.modes.gamemode'
 local Piece = require 'tetris.components.piece'
 
-local History6RollsRandomizer = require 'tetris.randomizers.history_6rolls'
+local History6RollsRandomizer = require 'tetris.randomizers.history_6rolls_35bag'
 
 local PhantomMania2Game = GameMode:extend()
 
@@ -28,7 +28,7 @@ function PhantomMania2Game:new()
 	
 	self.SGnames = {
 		"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9",
-		"m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9",
+		"M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9",
 		"GM"
 	}
 
@@ -179,7 +179,7 @@ function PhantomMania2Game:onPieceLock(piece, cleared_row_count)
 end
 
 function PhantomMania2Game:onHold()
-	self.super.onHold()
+	self.super:onHold()
 	self.hold_age = 0
 end
 
@@ -202,13 +202,13 @@ end
 local cool_cutoffs = {
 	frameTime(0,36), frameTime(0,36), frameTime(0,36), frameTime(0,36), frameTime(0,36),
 	frameTime(0,30), frameTime(0,30), frameTime(0,30), frameTime(0,30), frameTime(0,30),
-	frameTime(0,27), frameTime(0,27), frameTime(0,27),
+	frameTime(0,30), frameTime(0,30), frameTime(0,30),
 }
 
 local regret_cutoffs = {
 	frameTime(0,50), frameTime(0,50), frameTime(0,50), frameTime(0,50), frameTime(0,50),
-	frameTime(0,40), frameTime(0,40), frameTime(0,40), frameTime(0,40), frameTime(0,40),
-	frameTime(0,35), frameTime(0,35), frameTime(0,35),
+	frameTime(0,42), frameTime(0,42), frameTime(0,42), frameTime(0,42), frameTime(0,42),
+	frameTime(0,42), frameTime(0,42), frameTime(0,42),
 }
 
 function PhantomMania2Game:updateSectionTimes(old_level, new_level)
@@ -251,7 +251,7 @@ PhantomMania2Game.garbageOpacityFunction = function(age)
 end
 
 function PhantomMania2Game:drawGrid()
-	if not (self.game_over) then
+	if not (self.game_over or self.completed or (self.clear and self.level < 1300)) then
 		self.grid:drawInvisible(self.rollOpacityFunction, self.garbageOpacityFunction)
 	else
 		self.grid:draw()
@@ -287,7 +287,8 @@ function PhantomMania2Game:setHoldOpacity()
 	if self.level > 1000 and self.level < 1300 then
 		love.graphics.setColor(1, 1, 1, 1 - math.min(1, self.hold_age / 15))
 	else
-		self.super:setHoldOpacity(1, self.held and 0.6 or 1)
+		local colour = self.held and 0.6 or 1
+		love.graphics.setColor(colour, colour, colour, 1)
 	end
 end
 

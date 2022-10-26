@@ -4,23 +4,33 @@ CreditsScene.title = "Credits"
 
 function CreditsScene:new()
     self.frames = 0
+    -- higher = slower
+    self.scroll_speed = 1.8
     switchBGM("credit_roll", "gm3")
+
+    DiscordRPC:update({
+        details = "Watching the credits",
+        state = "Thanks for playing the game!",
+        largeImageKey = "ingame-1900",
+    })
 end
 
 function CreditsScene:update()
     if love.window.hasFocus() then
         self.frames = self.frames + 1
     end
-    if self.frames >= 4200 then
+    if self.frames >= 2100 * self.scroll_speed then
         playSE("mode_decide")
         scene = TitleScene()
         switchBGM(nil)
-    elseif self.frames == 3600 then
+    elseif self.frames == math.floor(1950 * self.scroll_speed) then
         fadeoutBGM(2)
     end
 end
 
 function CreditsScene:render()
+    local offset = self.frames / self.scroll_speed
+
     love.graphics.setColor(1, 1, 1, 1)
 	love.graphics.draw(
 		backgrounds[19],
@@ -29,31 +39,43 @@ function CreditsScene:render()
     )
 
     love.graphics.setFont(font_3x5_4)
-    love.graphics.print("Cambridge Credits", 320, 500 - self.frames / 2)
-    love.graphics.print("THANK YOU\nFOR PLAYING!", 320, math.max(1750 - self.frames / 2, 240))
+    love.graphics.print("Cambridge Credits", 320, 500 - offset)
+    love.graphics.print("THANK YOU\nFOR PLAYING!", 320, math.max(2050 - offset, 240))
 
     love.graphics.setFont(font_3x5_3)
-    love.graphics.print("Game Developers", 320, 550 - self.frames / 2)
-    love.graphics.print("Project Heads", 320, 640 - self.frames / 2)
-    love.graphics.print("Other Game Developers", 320, 730 - self.frames / 2)
-    love.graphics.print("Special Thanks", 320, 900 - self.frames / 2)
-    love.graphics.print("- SashLilac / SpinTriple", 320, math.max(2000 - self.frames / 2, 320))
+    love.graphics.print("Game Developers", 320, 550 - offset)
+    love.graphics.print("Project Heads", 320, 640 - offset)
+    love.graphics.print("Notable Game Developers", 320, 750 - offset)
+    love.graphics.print("Special Thanks", 320, 1000 - offset)
+    love.graphics.print("- Milla", 320, math.max(2130 - offset, 320))
 
     love.graphics.setFont(font_3x5_2)
-    love.graphics.print("Oshisaure\nJoe Zeng", 320, 590 - self.frames / 2)
-    love.graphics.print("Mizu\nHailey", 320, 680 - self.frames / 2)
-    love.graphics.print("Axel Fox - Multimino\nMine - Tetra Online\nDr Ocelot - Tetra Legends\nFelicity / nightmareci - Shiromino\n2Tie - TGMsim\nPhoenix Flare - Master of Blocks", 320, 770 - self.frames / 2)
+    love.graphics.print("Oshisaure\nJoe Zeng", 320, 590 - offset)
+    love.graphics.print("Mizu\nMarkGamed\nHailey", 320, 680 - offset)
     love.graphics.print(
-        "RocketLanterns\nCylinderKnot\nHammrTime\nKirby703\nMattMayuga\nMyPasswordIsWeak\n" ..
-        "Nikki Karissa\noffwo\nsinefuse\nTetro48\nTimmSkiller\nuser74003\nAgentBasey\n" ..
-        "CheeZed_Fish\neightsixfivezero\nEricICX\ngizmo4487\nM1ssing0\nMarkGamed7794\n" ..
-        "pokemonfan1937\nSimon\nstratus\nZaptorZap\nArchina\nOliver\ncolour_thief\n" ..
-        "Caithness\nkdex\nzid\nsaphie\nSuper302\nAurora\nswitchpalacecorner\nKitaru\n" ..
-        "JBroms\nMany more I definitely missed!\n" ..
-        "The Absolute PLUS Discord\nTetra Legends Discord\nTetra Online Discord\n" ..
-        "Multimino Discord\nHard Drop Discord\nCambridge Discord (R.I.P.)\n" ..
+        "2Tie - TGMsim\nAxel Fox - Multimino\nDr Ocelot - Tetra Legends\n" ..
+        "Electra - ZTrix\nFelicity/nightmareci/kdex - Shiromino\n" ..
+        "Mine - Tetra Online\nMrZ - Techmino\n" ..
+        "Phoenix Flare - Master of Blocks\nRayRay26 - Spirit Drop\n" ..
+        "Rin - Puzzle Trial\nsinefuse - stackfuse",
+        320, 790 - offset
+    )
+    love.graphics.print(
+        "321MrHaatz\nAdventium\nAgentBasey\nArchina\nAurora\n" ..
+        "Caithness\nCheez\ncolour_thief\nCommando\nCublex\n" ..
+        "CylinderKnot\neightsixfivezero\nEricICX\nGesomaru\n" ..
+        "gizmo4487\nJBroms\nKirby703\nKitaru\n" ..
+        "M1ssing0\nMattMayuga\nMyPasswordIsWeak\n" ..
+        "Nikki Karissa\nnim\noffwo\nOliver\nPineapple\npokemonfan1937\n" ..
+        "Pyra Neoxi\nRDST64\nRocketLanterns\nRustyFoxxo\n" ..
+        "saphie\nShelleloch\nSimon\nstratus\nSuper302\n" ..
+        "switchpalacecorner\nterpyderp\nTetrian22\nTetro48\nThatCookie\n" ..
+        "TimmSkiller\nTrixciel\nuser74003\nZaptorZap\nZircean\n" ..
+        "All other contributors and friends!\nThe Absolute PLUS Discord\n" ..
+        "Tetra Legends Discord\nTetra Online Discord\nMultimino Discord\n" ..
+        "Hard Drop Discord\nRusty's Systemspace\nCambridge Discord\n" ..
         "And to you, the player!",
-        320, 940 - self.frames / 2
+        320, 1040 - offset
     )
 end
 

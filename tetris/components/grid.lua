@@ -182,6 +182,19 @@ function Grid:clearSpecificRow(row)
 	end
 end
 
+function Grid:clearBlock(x, y)
+	self.grid[x+1][y+1] = empty
+end
+
+function Grid:clearBottomRows(num)
+	local old_isRowFull = self.isRowFull
+    self.isRowFull = function(self, row)
+		return row >= self.height + 1 - num
+	end
+    self:clearClearedRows()
+    self.isRowFull = old_isRowFull
+end
+
 function Grid:applyPiece(piece)
 	if piece.big then
 		self:applyBigPiece(piece)
@@ -349,7 +362,7 @@ function Grid:markSquares()
 					elseif i == 2 then
 						for j = 0, 3 do
 							for k = 0, 3 do
-								self.grid[y+j][x+k].colour = "F"
+								self.grid[y+j][x+k].colour = "W"
 								self.grid[y+j][x+k].skin = "square"
 							end
 							
@@ -400,11 +413,10 @@ function Grid:draw()
 					love.graphics.setColor(1, 1, 1, 1)
 					love.graphics.draw(blocks[self.grid[y][x].skin]["F"], 48+x*16, y*16)
 				else
-					if self.grid[y][x].skin == "bone" then
-						love.graphics.setColor(1, 1, 1, 1)
-					elseif self.grid[y][x].colour == "X" then
+					if self.grid[y][x].colour == "X" then
 						love.graphics.setColor(0, 0, 0, 0)
-						--love.graphics.setColor(0.5, 0.5, 0.5, 1 - self.grid_age[y][x] / 15)
+					elseif self.grid[y][x].skin == "bone" then
+						love.graphics.setColor(1, 1, 1, 1)
 					else
 						love.graphics.setColor(0.5, 0.5, 0.5, 1)
 					end
@@ -435,12 +447,6 @@ end
 function Grid:drawOutline()
 	for y = 5, self.height do
 		for x = 1, self.width do
-			--[[
-			if self.grid[y][x].colour == "X" then
-				love.graphics.setColor(0.5, 0.5, 0.5, 1 - self.grid_age[y][x] / 15)
-				love.graphics.draw(blocks[self.grid[y][x].skin][self.grid[y][x].colour], 48+x*16, y*16)
-			end
-			]]
 			if self.grid[y][x] ~= empty and self.grid[y][x].colour ~= "X" then
 				love.graphics.setColor(0.8, 0.8, 0.8, 1)
 				love.graphics.setLineWidth(1)
@@ -470,7 +476,6 @@ function Grid:drawInvisible(opacity_function, garbage_opacity_function, lock_fla
 			if self.grid[y][x] ~= empty then
 				if self.grid[y][x].colour == "X" then
 					opacity = 0
-					--opacity = 1 - self.grid_age[y][x] / 15
 				elseif garbage_opacity_function and self.grid[y][x].colour == "A" then
 					opacity = garbage_opacity_function(self.grid_age[y][x])
 				else
@@ -518,7 +523,6 @@ function Grid:drawCustom(colour_function, gamestate)
                 local R, G, B, A, outline = colour_function(gamestate, block, x, y, self.grid_age[y][x])
 				if self.grid[y][x].colour == "X" then
 					A = 0
-					--A = 1 - self.grid_age[y][x] / 15
 				end
 				love.graphics.setColor(R, G, B, A)
 				love.graphics.draw(blocks[self.grid[y][x].skin][self.grid[y][x].colour], 48+x*16, y*16)

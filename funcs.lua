@@ -1,10 +1,20 @@
 function copy(t)
-	-- returns deep copy of t (as opposed to the shallow copy you get from var = t)
+	-- returns top-layer shallow copy of t
 	if type(t) ~= "table" then return t end
-	local meta = getmetatable(t)
 	local target = {}
-	for k, v in pairs(t) do target[k] = v end
-	setmetatable(target, meta)
+	for k, v in next, t do target[k] = v end
+	setmetatable(target, getmetatable(t))
+	return target
+end
+
+function deepcopy(t)
+    -- returns infinite-layer deep copy of t
+	if type(t) ~= "table" then return t end
+	local target = {}
+	for k, v in next, t do
+		target[deepcopy(k)] = deepcopy(v)
+	end
+	setmetatable(target, deepcopy(getmetatable(t)))
 	return target
 end
 
@@ -87,6 +97,50 @@ function table.contains(table, element)
 	return false
 end
 
-function clamp(a, b, c)
-	return math.min(a, math.max(b, c))
+function table.keys(table)
+	local target = {}
+	for key in pairs(table) do
+		target[#target+1] = key
+	end
+	return target
+end
+
+function table.numkeys(table)
+	local count = 0
+	for k in pairs(table) do
+		count = count + 1
+	end
+	return count
+end
+
+function equals(x, y)
+	if type(x) ~= "table" or type(y) ~= "table" then
+		return x == y
+	else
+		for k in pairs(x) do
+			if not equals(x[k], y[k]) then return false end
+		end
+		for k in pairs(y) do
+			if not equals(x[k], y[k]) then return false end
+		end
+		return true
+	end
+end
+
+function table.equalvalues(t1, t2)
+	if table.numkeys(t1) ~= table.numkeys(t2) then
+		return false
+	else
+		for _, v in pairs(t2) do
+			if not table.contains(t1, v) then return false end
+		end
+		return true
+	end
+end
+
+function clamp(x, min, max)
+	if max < min then
+		min, max = max, min
+	end
+	return x < min and min or (x > max and max or x)
 end
